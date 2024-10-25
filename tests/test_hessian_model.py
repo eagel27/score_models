@@ -4,7 +4,7 @@ import pytest
 import os
 
 
-@pytest.mark.parametrize("loss", ["canonical", "meng"])
+@pytest.mark.parametrize("loss", ["lu", "meng"])
 def test_save_load_hessian_diagonal(loss, tmp_path):
     path = os.path.join(tmp_path, "test")
     net = MLP(10)
