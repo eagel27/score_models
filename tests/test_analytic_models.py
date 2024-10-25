@@ -17,7 +17,6 @@ import pytest
 @pytest.mark.parametrize("psd_shape", [(32, 32), (32, 16), (25,), (64,)])
 def test_grf(psd_shape):
     sde = VESDE(sigma_min=1e-2, sigma_max=10)
-
     if len(psd_shape) == 1:
         f = np.fft.fftfreq(psd_shape[0])
         f[0] = 1
@@ -26,25 +25,17 @@ def test_grf(psd_shape):
         # Frequency indices
         u = np.fft.fftfreq(psd_shape[0])
         v = np.fft.fftfreq(psd_shape[1])
-
         # Create a grid of frequencies
         U, V = np.meshgrid(u, v, indexing="ij")
-
         # Compute the squared frequency magnitude
         freq_magnitude_squared = U**2 + V**2
-
         # Avoid division by zero for the zero frequency
         freq_magnitude_squared[0, 0] = 1
-
         # Inverse square of the frequency magnitude
         power_spectrum = 1.0 / freq_magnitude_squared
-
     psd = torch.tensor(power_spectrum, dtype=torch.float32)
-
     model = GRFEnergyModel(sde, power_spectrum=psd)
-
     samples = model.sample(shape=(2, *psd_shape), steps=25)
-
     assert torch.all(torch.isfinite(samples))
 
 
@@ -72,7 +63,6 @@ def test_mvg_energy(mean, cov):
     )
 
     samples = model.sample(shape=(100, mean.shape[-1]), steps=50)
-
     assert torch.all(torch.isfinite(samples))
     if model.mixture:
         assert torch.allclose(
