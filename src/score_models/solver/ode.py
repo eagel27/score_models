@@ -13,9 +13,9 @@ class ODESolver(Solver):
     def solve(
         self,
         x: Tensor,
+        *args,
         steps: int,
         forward: bool,
-        *args,
         progress_bar: bool = True,
         trace: bool = False,
         kill_on_nan: bool = False,
