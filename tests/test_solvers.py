@@ -13,19 +13,13 @@ import pytest
 
 
 def test_solver_constructor():
-
     with pytest.raises(TypeError):  # abstract class cant be created
         Solver(None)
-
     assert isinstance(Solver(None, solver="EM_SDE"), EM_SDE), "EM_SDE not created"
-
     assert isinstance(ODESolver(None, solver="RK2_ODE"), RK2_ODE), "RK2_ODE not created"
-
     assert isinstance(EM_SDE(None), Solver), "EM_SDE not created"
-
     with pytest.raises(ValueError):  # unknown solver
         Solver(None, solver="random_solver")
-
     with pytest.raises(ValueError):  # unknown ode solver
         ODESolver(None, solver="EM_SDE")
 
@@ -49,7 +43,6 @@ def test_solver_sample(solver, mean, cov):
         mean=mean,
         cov=cov,
     )
-
     samples = model.sample(
         shape=(100, mean.shape[-1]),
         steps=50,
@@ -57,11 +50,8 @@ def test_solver_sample(solver, mean, cov):
         denoise_last_step=True,
         kill_on_nan=True,
     )
-
     assert torch.all(torch.isfinite(samples))
-
     assert torch.allclose(samples.mean(dim=0), mean, atol=1), "mean not close"
-
     assert torch.allclose(samples.std(dim=0), torch.tensor(1.0), atol=1), "std not close"
 
 
@@ -92,7 +82,6 @@ def test_solver_forward(solver, mean, cov):
     if "ode" in solver:  # check delta_logp calculation for ODE solvers
         xT, dlogp = xT
         assert torch.all(torch.isfinite(dlogp))
-
     assert torch.all(torch.isfinite(xT))
 
 

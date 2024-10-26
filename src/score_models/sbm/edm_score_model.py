@@ -24,6 +24,7 @@ class EDMScoreModel(Base):
         path: Optional[str] = None,
         checkpoint: Optional[int] = None,
         hessian_diagonal_model: Optional["HessianDiagonal"] = None,
+        sigma_data: Optional[Tensor] = None,
         device=DEVICE,
         **hyperparameters
     ):
@@ -32,25 +33,32 @@ class EDMScoreModel(Base):
             self.dlogp = hessian_diagonal_model.dlogp
         else:
             self.dlogp = None
+        self.sigma_data = sigma_data
+        if sigma_data is None:
+            raise ValueError("sigma_data must be provided")
 
     def loss(self, x, *args, step: int) -> Tensor:
         return dsm(self, x, *args)
     
-    def c_in(self, t: Tensor,  *args, **kwargs) -> Tensor:
-        ...
+    # Denoiser version
+    def c_in(self, t: Tensor) -> Tensor:
+        sigma = self.sde.sigma(t)
+        return 1 / (sigma**2 + self.sigma_data**2)
     
-    def c_out(self, t: Tensor,  *args, **kwargs) -> Tensor:
-        ...
+    def c_out(self, t: Tensor) -> Tensor:
+        sigma = self.sde.sigma(t)
+        return sigma * self.sigma_data / (sigma**2 + self.sigma_data**2)
 
-    def c_skip(self, t: Tensor, *args, **kwargs) -> Tensor:
-        ...
+    def c_skip(self, t: Tensor) -> Tensor:
+        sigma = self.sde.sigma(t)
+        return sigma**2 / (sigma**2 + self.sigma_data**2)
 
-    def c_noise(self, t: Tensor,  *args, **kwargs) -> Tensor:
-        ...
+    def c_noise(self, t: Tensor) -> Tensor:
+        return torch.log(self.sigma(t))/4
 
     def reparametrized_score(self, t, x: Tensor, *args, **kwargs) -> Tensor:
-        ...
-        
+        F = self.net(self.c_noise(t), self.c_int(t) * x, *args, **kwargs)
+        return self.c_skip(t) * x + self.c_out(t) * F
 
     def forward(self, t, x, *args, **kwargs):
         """
