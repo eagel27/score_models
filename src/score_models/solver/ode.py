@@ -137,6 +137,7 @@ class ODESolver(Solver):
         if noise_type == "rademacher":
             z = z.sign()
 
+        # Compute the trace of the divergence of the drift function
         f = lambda x: self.dx(t, x, *args, dt=dt, **kwargs)
         _, vjp_func = vjp(f, x)
         divergence = (z * vmap(vjp_func)(z)[0]).mean(0).flatten(1).sum(1)
