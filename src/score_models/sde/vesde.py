@@ -30,11 +30,6 @@ class VESDE(SDE):
     def sigma(self, t: Tensor) -> Tensor:
         return self.sigma_min * (self.sigma_max / self.sigma_min) ** (t / self.T)
 
-    def t_sigma(self, sigma: Tensor) -> Tensor:
-        return torch.log(torch.as_tensor(sigma / self.sigma_min, device=DEVICE)) / torch.log(
-            torch.as_tensor(self.sigma_max / self.sigma_min, device=DEVICE)
-        )
-
     def diffusion(self, t: Tensor, x: Tensor) -> Tensor:
         _, *D = x.shape  # broadcast diffusion coefficient to x shape
         # Analytical derivative of the sigma**2 function, square rooted at the end
@@ -48,3 +43,8 @@ class VESDE(SDE):
         if mean is None:
             mean = torch.zeros(shape).to(device)
         return Independent(Normal(loc=mean, scale=self.sigma_max, validate_args=False), len(shape))
+
+    def t_sigma(self, sigma: Tensor) -> Tensor:
+        return torch.log(torch.as_tensor(sigma / self.sigma_min, device=DEVICE)) / torch.log(
+            torch.as_tensor(self.sigma_max / self.sigma_min, device=DEVICE)
+        )
