@@ -28,7 +28,6 @@ class Solver(ABC):
     The only requirement on init is a ScoreModel object, which is used to define
     the DE by providing the SDE object and the score.
     """
-
     def __new__(cls, *args, solver=None, **kwargs):
         """Create the correct Solver subclass given the solver name."""
         if solver is not None:
@@ -42,37 +41,36 @@ class Solver(ABC):
 
         return super(Solver, cls).__new__(cls)
 
-    def __init__(self, score, *args, **kwargs):
-        self.score = score
+    def __init__(self, sbm, *args, **kwargs):
+        self.sbm = sbm
 
     @abstractmethod
     def solve(
-        self, x, steps, forward, *args, progress_bar=True, trace=False, kill_on_nan=False, **kwargs
+            self, x, *args, steps: int, forward: bool, progress_bar=True, trace=False, kill_on_nan=False, **kwargs
     ): ...
 
     @abstractmethod
-    def dx(self, t, x, args, dt, **kwargs): ...
+    def dx(self, t, x, *args, dt, **kwargs): ...
 
     @abstractmethod
-    def step(self, t, x, args, dt, dx, **kwargs): ...
+    def step(self, t, x, *args, dt, dx, **kwargs): ...
 
     def __call__(
         self,
         x,
-        steps,
         *args,
+        steps: int,
         forward=False,
         progress_bar=True,
         trace=False,
         kill_on_nan=False,
         **kwargs,
     ):
-        """Calls the solve method with the given arguments."""
         return self.solve(
             x,
-            steps,
-            forward,
             *args,
+            steps=steps,
+            forward=forward,
             progress_bar=progress_bar,
             trace=trace,
             kill_on_nan=kill_on_nan,
@@ -81,7 +79,7 @@ class Solver(ABC):
 
     @property
     def sde(self):
-        return self.score.sde
+        return self.sbm.sde
 
     def time_steps(
         self,
@@ -139,4 +137,4 @@ class Solver(ABC):
         B, *D = x.shape
         mu = self.sde.mu(t).view(-1, *[1] * len(D))
         sigma = self.sde.sigma(t).view(-1, *[1] * len(D))
-        return (x + sigma**2 * self.score(t, x, *args, **kwargs)) / mu
+        return (x + sigma**2 * self.sbm.score(t, x, *args, **kwargs)) / mu

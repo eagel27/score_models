@@ -192,7 +192,7 @@ def test_training_energy_model(sde, Net, tmp_path, capsys):
     (None, None, None), # conditions, embeddings, channels
     (("input_tensor", "time_continuous", "time_vector", "time_discrete"), (15,), (15, 3)),
     ])
-@pytest.mark.parametrize("loss", ["canonical", "meng"])
+@pytest.mark.parametrize("loss", ["lu", "meng"])
 @pytest.mark.parametrize("sde", [
     {"sde": "vp"}, 
     {"sde": "ve", "sigma_min": 1e-2, "sigma_max": 1e2}, 

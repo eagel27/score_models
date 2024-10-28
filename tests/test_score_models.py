@@ -19,19 +19,19 @@ def local_test_loading_model_and_score_fn():
 
 
 def test_loading_from_string():
-    score = ScoreModel("mlp", sigma_min=1e-2, sigma_max=10, dimensions=2)
+    score = ScoreModel("mlp", sigma_min=1e-2, sigma_max=10, channels=2)
     print(score.sde)
     x = torch.randn(1, 2)
     t = torch.ones(1)
     score(t, x)
 
-    score = EnergyModel("mlp", sigma_min=1e-2, sigma_max=10, dimensions=2)
+    score = EnergyModel("mlp", sigma_min=1e-2, sigma_max=10, channels=2)
     print(score.sde)
     x = torch.randn(1, 2)
     t = torch.ones(1)
     score(t, x)
 
-    score = EnergyModel("mlp", sigma_min=1e-2, sigma_max=10, dimensions=2, nn_is_energy=True)
+    score = EnergyModel("mlp", sigma_min=1e-2, sigma_max=10, channels =2, nn_is_energy=True)
     print(score.sde)
     x = torch.randn(1, 2)
     t = torch.ones(1)
@@ -45,21 +45,21 @@ def test_loading_from_string():
 
 
 def test_loading_with_nn():
-    net = MLP(dimensions=2)
+    net = MLP(2)
     score = ScoreModel(net, sigma_min=1e-2, sigma_max=10)
     print(score.sde)
     x = torch.randn(1, 2)
     t = torch.ones(1)
     score(t, x)
 
-    net = MLP(dimensions=2)
+    net = MLP(2)
     score = EnergyModel(net, sigma_min=1e-2, sigma_max=10)
     print(score.sde)
     x = torch.randn(1, 2)
     t = torch.ones(1)
     score(t, x)
 
-    net = MLP(dimensions=2, nn_is_energy=True)
+    net = MLP(2, nn_is_energy=True)
     score = EnergyModel(net, sigma_min=1e-2, sigma_max=10)
     print(score.sde)
     x = torch.randn(1, 2)
@@ -78,20 +78,6 @@ def test_init_score():
     net = MLP(10)
     with pytest.raises(KeyError):
         score = ScoreModel(net)
-
-
-def test_log_likelihood():
-    net = MLP(dimensions=2)
-    score = ScoreModel(net, beta_min=1e-2, beta_max=10)
-    print(score.sde)
-    x = torch.randn(3, 2)
-    ll = score.log_likelihood(x, steps=10, verbose=1, method="euler_ode")
-    print(ll)
-    assert ll.shape == torch.Size([3])
-
-    ll = score.log_likelihood(x, steps=10, verbose=1, method="rk2_ode")
-    print(ll)
-    assert ll.shape == torch.Size([3])
 
 
 def test_sample_method():
@@ -160,6 +146,18 @@ def test_loading_different_sdes():
     assert score.sde.T == 1
     assert score.sde.t_star == 0.5
     assert score.sde.beta == 10
+
+
+@pytest.mark.parametrize("method", ["euler_ode", "rk2_ode", "rk4_ode"])
+@pytest.mark.parametrize("steps", [10, 20])
+@pytest.mark.parametrize("cotangent_vectors", [1, 5, 10])
+def test_log_prob(method, steps, cotangent_vectors):
+    net = MLP(2)
+    score = ScoreModel(net, sigma_min=1e-2, sigma_max=10)
+    x = torch.randn(3, 2)
+    ll = score.log_prob(x, steps=steps, method=method, cotangent_vectors=cotangent_vectors)
+    print(ll)
+    assert ll.shape == torch.Size([3])
 
 
 if __name__ == "__main__":

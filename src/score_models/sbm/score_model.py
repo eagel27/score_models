@@ -1,4 +1,4 @@
-from typing import Union, Optional, Literal
+from typing import Union, Optional, Literal, TYPE_CHECKING
 
 from torch import Tensor
 from torch.nn import Module
@@ -9,6 +9,8 @@ from ..sde import SDE
 from ..losses import dsm
 from ..solver import Solver, ODESolver
 from ..utils import DEVICE
+if TYPE_CHECKING:
+    from score_models import HessianDiagonal
 
 
 __all__ = ["ScoreModel"]
@@ -21,12 +23,15 @@ class ScoreModel(Base):
         sde: Optional[Union[str, SDE]] = None,
         path: Optional[str] = None,
         checkpoint: Optional[int] = None,
-        hessian_trace_model: Optional[Union[str, Module]] = None,
+        hessian_diagonal_model: Optional["HessianDiagonal"] = None,
         device=DEVICE,
         **hyperparameters
     ):
         super().__init__(net, sde, path, checkpoint=checkpoint, device=device, **hyperparameters)
-        self.hessian_trace_model = hessian_trace_model
+        if hessian_diagonal_model is not None:
+            self.dlogp = hessian_diagonal_model.dlogp
+        else:
+            self.dlogp = None
 
     def loss(self, x, *args, step: int) -> Tensor:
         return dsm(self, x, *args)
@@ -48,14 +53,14 @@ class ScoreModel(Base):
     def score(self, t, x, *args, **kwargs) -> Tensor:
         _, *D = x.shape
         sigma_t = self.sde.sigma(t).view(-1, *[1] * len(D))
-        epsilon_theta = self.reparametrized_score(t, x, *args, **kwargs)
-        return epsilon_theta / sigma_t
+        epsilon = self.reparametrized_score(t, x, *args, **kwargs)
+        return epsilon / sigma_t
 
-    def log_likelihood(
+    def log_prob(
         self,
         x,
         *args,
-        steps,
+        steps: int,
         t=0.0,
         solver: Literal["euler_ode", "rk2_ode", "rk4_ode"] = "euler_ode",
         **kwargs
@@ -67,24 +72,21 @@ class ScoreModel(Base):
         See Song et al. 2020 (arxiv.org/abs/2011.13456) for usage with SDE formalism of SBM.
         """
         B, *D = x.shape
-
         solver = ODESolver(self, solver=solver, **kwargs)
         # Solve the probability flow ODE up in temperature to time t=1.
-        xT, dlog_p = solver(
-            x, *args, steps=steps, forward=True, t_min=t, **kwargs, get_delta_logp=True
+        xT, dlogp = solver(
+            x, *args, steps=steps, forward=True, t_min=t, **kwargs, return_dlogp=True, dlogp=self.dlogp
         )
-
         # add boundary condition PDF probability
-        log_p = self.sde.prior(D).log_prob(xT) + dlog_p
-
-        return log_p
+        logp = self.sde.prior(D).log_prob(xT) + dlogp
+        return logp
 
     @torch.no_grad()
     def sample(
         self,
+        *args,
         shape: tuple,  # TODO grab dimensions from model hyperparams if available
         steps: int,
-        *args,
         solver: Literal[
             "em_sde", "rk2_sde", "rk4_sde", "euler_ode", "rk2_ode", "rk4_ode"
         ] = "em_sde",
@@ -100,7 +102,6 @@ class ScoreModel(Base):
 
         """
         B, *D = shape
-
         solver = Solver(self, solver=solver, **kwargs)
         xT = self.sde.prior(D).sample([B])
         x0 = solver(
@@ -112,7 +113,6 @@ class ScoreModel(Base):
             denoise_last_step=denoise_last_step,
             **kwargs
         )
-
         return x0
 
     @torch.no_grad()
@@ -120,8 +120,8 @@ class ScoreModel(Base):
         self,
         t: Tensor,
         xt: Tensor,
-        steps: int,
         *args,
+        steps: int,
         solver: Literal[
             "em_sde", "rk2_sde", "rk4_sde", "euler_ode", "rk2_ode", "rk4_ode"
         ] = "em_sde",
@@ -145,7 +145,6 @@ class ScoreModel(Base):
             denoise_last_step=denoise_last_step,
             **kwargs
         )
-
         return x0
 
     def tweedie(self, t: Tensor, x: Tensor, *args, **kwargs) -> Tensor:
