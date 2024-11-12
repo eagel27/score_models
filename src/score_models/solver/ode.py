@@ -2,7 +2,7 @@ from typing import Callable, Literal, Optional
 
 import torch
 from torch import Tensor
-from torch.func import vjp
+from torch.func import vjp, vmap
 from tqdm import tqdm
 from .solver import Solver
 
@@ -116,7 +116,7 @@ class ODESolver(Solver):
         x: Tensor,
         *args,
         dt: Tensor,
-        n_cot_vec: int = 1,
+        cotangent_vectors: int = 1,
         noise_type: Literal["rademacher", "gaussian"] = "rademacher",
         **kwargs,
     ):
@@ -131,26 +131,16 @@ class ODESolver(Solver):
             n_cot_vec: Number of cotangent vectors to sample for the Hutchinson trace estimator.
             noise_type: Type of noise to sample, either 'rademacher' or 'gaussian'.
         """
-        _, *D = x.shape
-        # duplicate samples for for the Hutchinson trace estimator
-        samples = torch.tile(x, [n_cot_vec, *[1]*len(D)])
-        t = torch.tile(t, [n_cot_vec])
-        dt = torch.tile(dt, [n_cot_vec, *[1]*len(D)])
-        _args = []
-        for arg in args:
-            _, *DA = arg.shape
-            arg = torch.tile(arg, [n_cot_vec, *[1]*len(DA)])
-            _args.append(arg)
-
-        # sample cotangent vectors
-        vectors = torch.randn_like(samples)
+        B, *D = x.shape
+        # Sample cotangent vectors
+        z = torch.randn([cotangent_vectors, B, *D], device=x.device, dtype=x.dtype)
         if noise_type == "rademacher":
-            vectors = vectors.sign()
+            z = z.sign()
 
-        f = lambda x: self.dx(t, x, *_args, dt=dt, **kwargs)
-        _, vjp_func = vjp(f, samples)
-        divergence = (vectors * vjp_func(vectors)[0]).flatten(1).sum(dim=1)
-        divergence = divergence.view(n_cot_vec, -1).mean(dim=0)
+        # Compute the trace of the divergence of the drift function
+        f = lambda x: self.dx(t, x, *args, dt=dt, **kwargs)
+        _, vjp_func = vjp(f, x)
+        divergence = (z * vmap(vjp_func)(z)[0]).mean(0).flatten(1).sum(1)
         return divergence
 
 

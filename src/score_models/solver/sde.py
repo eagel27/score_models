@@ -13,9 +13,9 @@ class SDESolver(Solver):
     def solve(
         self,
         x: Tensor,
+        *args: tuple,
         steps: int,
         forward: bool,
-        *args: tuple,
         progress_bar: bool = True,
         trace: bool = False,
         kill_on_nan: bool = False,

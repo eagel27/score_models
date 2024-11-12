@@ -60,7 +60,7 @@ class ScoreModel(Base):
         self,
         x,
         *args,
-        steps,
+        steps: int,
         t=0.0,
         solver: Literal["euler_ode", "rk2_ode", "rk4_ode"] = "euler_ode",
         **kwargs
@@ -84,9 +84,9 @@ class ScoreModel(Base):
     @torch.no_grad()
     def sample(
         self,
-        shape: tuple,
-        steps: int,
         *args,
+        shape: tuple,  # TODO grab dimensions from model hyperparams if available
+        steps: int,
         solver: Literal[
             "em_sde", "rk2_sde", "rk4_sde", "euler_ode", "rk2_ode", "rk4_ode"
         ] = "em_sde",
@@ -102,7 +102,6 @@ class ScoreModel(Base):
 
         """
         B, *D = shape
-
         solver = Solver(self, solver=solver, **kwargs)
         xT = self.sde.prior(D).sample([B])
         x0 = solver(
@@ -121,8 +120,8 @@ class ScoreModel(Base):
         self,
         t: Tensor,
         xt: Tensor,
-        steps: int,
         *args,
+        steps: int,
         solver: Literal[
             "em_sde", "rk2_sde", "rk4_sde", "euler_ode", "rk2_ode", "rk4_ode"
         ] = "em_sde",
