@@ -383,19 +383,100 @@
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section class="tex2jax_ignore mathjax_ignore" id="diffusion">
+  <div class="cell tag_hide-input docutils container">
+<details class="hide above-input">
+<summary aria-label="Toggle hidden content">
+<span class="collapsed">Show code cell source</span>
+<span class="expanded">Hide code cell source</span>
+</summary>
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">score_models.plot_utils</span> <span class="kn">import</span> <span class="o">*</span>
+</pre></div>
+</div>
+</div>
+</details>
+</div>
+<section class="tex2jax_ignore mathjax_ignore" id="diffusion">
 <h1>Diffusion<a class="headerlink" href="#diffusion" title="Link to this heading">#</a></h1>
-<p>Diffusion is a rather old concept in physics. The phenomena was first discovered by Robert Brown in 1827 when he was studying the movement of molecules suspended in a stationary liquid. A formal theory of Brownian motion was developped by <a class="reference external" href="https://www.damtp.cam.ac.uk/user/gold/pdfs/teaching/old_literature/Einstein1905.pdf">Einstein in 1905</a>, linking Brownian motion to the kinetic theory of heat dissipation.</p>
+<p>Diffusion is a rather old concept in physics. The phenomena was first discovered by botanist Robert Brown in 1827 when he was studying the movement of molecules suspended in a stationary liquid. An explanation of Brownian motion was developped by <a class="reference external" href="https://www.damtp.cam.ac.uk/user/gold/pdfs/teaching/old_literature/Einstein1905.pdf">Einstein in 1905</a>, linking Brownian motion to the kinetic theory of heat dissipation.</p>
 <p>In this section, we will build a diffusion model from scratch.
 To do this, I provide a minimal description of stochastic processes based on
-Brownian motion, Langevin dynamics, the heat equation and the more general Fokker-Planck equation.
+Brownian motion and Langevin dynamics.
 I try to keep the theoretical description of diffusion to a minimum to avoid overloading this section with technical
-concepts.
-The more general theory that describes Stochastic Differential Equations and Itô Calculus are touched upon in a different section for the reader interested in more advanced concepts.</p>
+concepts, though I must minimally touch on the heat equation and the Fokker-Planck equation to give the full picture.</p>
 <p>I have decided to mute the connection with thermodynamic to some degree.
 Of course, thermodynamic served as the main inspiration for the invention of diffusion models (<a class="reference external" href="https://arxiv.org/abs/1503.03585">Sohl-Dickstein et al. 2015</a>). So I might eventually explore this work in a separate section.</p>
 <section id="brownian-motion">
 <h2>Brownian motion<a class="headerlink" href="#brownian-motion" title="Link to this heading">#</a></h2>
+<p>The formal description of Brownian motion is named after Norbert Wiener,
+who studied the mathematical properties of one-dimensional stochastic processes.
+Put simply, a stochastic process is akin to a curve — though this curve is nowhere differentiable — defined by a series of <em>random increments</em>.
+A Wiener process is the simplest case where each increments, <span class="math notranslate nohighlight">\(\Delta \mathbf{w}_{t} = \mathbf{w}_{t + \Delta t} - \mathbf{w}_t \)</span>, are identically and independently distributed (iid) with a Gaussian distribution</p>
+<div class="math notranslate nohighlight">
+\[
+    \Delta \mathbf{w}_{t} \sim \mathcal{N}(0, \Delta t)
+\]</div>
+<p><span class="math notranslate nohighlight">\(t\)</span> is interpreted as the time elapsed for the process.
+The typical length of the Brownian motion is proportional to the time elapsed. More specifically,
+the length is proportional to <span class="math notranslate nohighlight">\(\sqrt{\Delta t}\)</span>, since <span class="math notranslate nohighlight">\(\Delta t\)</span> corresponds to the <em>variance</em> of the increment
+distribution. Below we give an example of a Wiener process,
+where we discretize a Brownian motion into <span class="math notranslate nohighlight">\(N\)</span> intervals.
+In that case, we can describe the random variable <span class="math notranslate nohighlight">\(\mathbf{w}_t\)</span> as a sum over <span class="math notranslate nohighlight">\(N\)</span> independent increment</p>
+<div class="math notranslate nohighlight">
+\[
+    \mathbf{w}_t = \sum_{i = 0}^{N-1} \Delta \mathbf{w}_{i \Delta t}
+\]</div>
+<div class="cell tag_hide-cell docutils container">
+<details class="hide above-input">
+<summary aria-label="Toggle hidden content">
+<span class="collapsed">Show code cell content</span>
+<span class="expanded">Hide code cell content</span>
+</summary>
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">N</span> <span class="o">=</span> <span class="mi">1000</span>
+<span class="n">dt</span> <span class="o">=</span> <span class="mi">1</span><span class="o">/</span><span class="n">N</span>
+
+<span class="c1"># Wiener process</span>
+<span class="n">w</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="c1"># W_0 = 0</span>
+<span class="n">t</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="n">states</span> <span class="o">=</span> <span class="p">[(</span><span class="n">t</span><span class="p">,</span> <span class="n">w</span><span class="p">)]</span>
+<span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">):</span>
+    <span class="n">dw</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">w</span><span class="p">)</span> <span class="o">*</span> <span class="n">dt</span><span class="o">**</span><span class="mf">0.5</span> <span class="c1"># dW_n ~ N(0, dt)</span>
+    <span class="n">w</span> <span class="o">=</span> <span class="n">w</span> <span class="o">+</span> <span class="n">dw</span>
+    <span class="n">t</span> <span class="o">=</span> <span class="n">t</span> <span class="o">+</span> <span class="n">dt</span>
+    <span class="n">states</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">t</span><span class="p">,</span> <span class="n">w</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+</details>
+</div>
+<div class="cell tag_hide-input docutils container">
+<details class="hide above-input">
+<summary aria-label="Toggle hidden content">
+<span class="collapsed">Show code cell source</span>
+<span class="expanded">Hide code cell source</span>
+</summary>
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="o">*</span><span class="nb">list</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="n">states</span><span class="p">)),</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;w&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;$w_t$&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;$t$&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s1">&#39;Wiener process&#39;</span><span class="p">);</span>
+</pre></div>
+</div>
+</div>
+</details>
+<div class="cell_output docutils container">
+<img alt="../_images/288ea2b2665a585be49fdfe7d4bffd351559609d587a9fde866552fc16075173.png" src="../_images/288ea2b2665a585be49fdfe7d4bffd351559609d587a9fde866552fc16075173.png" />
+</div>
+</div>
+<p>I mentionned above that this curve is nowhere differentiable. This means that if we were to zoom-in on this curve, we would never obtain a smooth curve. This process is self-similar — no matter how fine the discretization, we always find discontinuous random increments.</p>
+<p>This realization has several interesting consequences.
+Though for our current purposes, it means that the kinetic picture, shown above, cannot be studied with classical tools like calculus — which is only suited for the study of smooth curves.
+Instead of introducing the rules of stochastic calculus, we instead consider the statistical ensemble picture.</p>
+<p>This is to say that we would like to understand the distribution of the Brownian motion, <span class="math notranslate nohighlight">\(p(\mathbf{w}_t)\)</span>, and its evolution in time.</p>
 </section>
 <section id="the-heat-equation">
 <h2>The Heat equation<a class="headerlink" href="#the-heat-equation" title="Link to this heading">#</a></h2>

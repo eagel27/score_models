@@ -470,7 +470,7 @@ You can find these routines in the <a class="reference internal" href="#./00-Ove
 <h3>Ground-truth score function<a class="headerlink" href="#ground-truth-score-function" title="Link to this heading">#</a></h3>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">distribution</span> <span class="o">=</span> <span class="n">egg_box</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">mode_width</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">box_size</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">distribution</span> <span class="o">=</span> <span class="n">eggbox</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">mode_width</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">box_size</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 
 <span class="k">def</span> <span class="nf">logp</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">distribution</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
@@ -516,7 +516,7 @@ You can find these routines in the <a class="reference internal" href="#./00-Ove
 </div>
 </div>
 <div class="cell_output docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "d6b95cddc0db470197469ca261ca99f4", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "fd8c23e500784dfabc2725744e9d1c5f", "version_major": 2, "version_minor": 0}</script></div>
 </details>
 </div>
 <div class="cell tag_hide-input docutils container">
@@ -536,7 +536,7 @@ You can find these routines in the <a class="reference internal" href="#./00-Ove
 </div>
 </details>
 <div class="cell_output docutils container">
-<img alt="../_images/c72ee95def337ec7aec853bcd3dcc9b86fc768f13713ff0ad8091db3d06d6cff.png" src="../_images/c72ee95def337ec7aec853bcd3dcc9b86fc768f13713ff0ad8091db3d06d6cff.png" />
+<img alt="../_images/9f9001d29a29f892ed3e1ba8203fdef8553ae2cd72f62fd48bccabe8f506d77d.png" src="../_images/9f9001d29a29f892ed3e1ba8203fdef8553ae2cd72f62fd48bccabe8f506d77d.png" />
 </div>
 </div>
 <div class="cell tag_hide-input docutils container">
@@ -551,25 +551,25 @@ You can find these routines in the <a class="reference internal" href="#./00-Ove
 
 <span class="n">ax</span> <span class="o">=</span> <span class="n">axs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
 <span class="n">plot_density</span><span class="p">(</span><span class="n">logp</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span> <span class="n">extent</span><span class="o">=</span><span class="n">extent</span><span class="p">)</span>
-<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;$ p(\mathbf</span><span class="si">{x}</span><span class="s2">)$&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;$ p(\bm</span><span class="si">{x}</span><span class="s2">)$&quot;</span><span class="p">)</span>
 <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;$x_2$&quot;</span><span class="p">)</span>
 <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;$x_1$&quot;</span><span class="p">)</span>
 
 <span class="n">ax</span> <span class="o">=</span> <span class="n">axs</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
 <span class="n">plot_score</span><span class="p">(</span><span class="n">score</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span> <span class="n">extent</span><span class="o">=</span><span class="n">extent</span><span class="p">)</span>
-<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;$\nabla_{\mathbf</span><span class="si">{x}</span><span class="s2">} \log p(\mathbf</span><span class="si">{x}</span><span class="s2">)$&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;$\grad_{\bm</span><span class="si">{x}</span><span class="s2">} \log p(\bm</span><span class="si">{x}</span><span class="s2">)$&quot;</span><span class="p">)</span>
 <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;$x_1$&quot;</span><span class="p">)</span>
 
 <span class="n">ax</span> <span class="o">=</span> <span class="n">axs</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
 <span class="n">plot_score</span><span class="p">(</span><span class="n">net</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span> <span class="n">extent</span><span class="o">=</span><span class="n">extent</span><span class="p">)</span>
-<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;$\mathbf</span><span class="si">{s}</span><span class="s2">_\theta(\mathbf</span><span class="si">{x}</span><span class="s2">)$&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;$\bm</span><span class="si">{s}</span><span class="s2">_\theta(\bm</span><span class="si">{x}</span><span class="s2">)$&quot;</span><span class="p">)</span>
 <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;$x_1$&quot;</span><span class="p">);</span>
 </pre></div>
 </div>
 </div>
 </details>
 <div class="cell_output docutils container">
-<img alt="../_images/5efd41d94838c05726df00c5b22b184827171b6b88cc4f1b4416b6c7921ccf8e.png" src="../_images/5efd41d94838c05726df00c5b22b184827171b6b88cc4f1b4416b6c7921ccf8e.png" />
+<img alt="../_images/dca805cc8aa5dc6075add1c4f810f3993a1c4f9cdc78871bd061986167788cd0.png" src="../_images/dca805cc8aa5dc6075add1c4f810f3993a1c4f9cdc78871bd061986167788cd0.png" />
 </div>
 </div>
 <p>Close to each mode, the score is very well approximated.
@@ -639,15 +639,15 @@ Also, to make the task easier for the neural network, we redefine the score to i
 <p><span class="math notranslate nohighlight">\(\mathbf{\epsilon}_\theta: [0, 1] \times \mathbb{R}^n \rightarrow \mathbb{R}^n\)</span> will be a neural network. Notice that we need to incorporate the temperature parameter as input. We must modify the architecture of the neural network accordingly in the implementation below.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">annealed_egg_box</span><span class="p">(</span><span class="n">beta</span><span class="p">):</span> <span class="c1"># p_{\beta}(\mathbf{x})</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">annealed_eggbox</span><span class="p">(</span><span class="n">beta</span><span class="p">):</span> <span class="c1"># p_{\beta}(\mathbf{x})</span>
     <span class="n">mode_width</span> <span class="o">=</span> <span class="mf">0.1</span> <span class="o">/</span> <span class="n">beta</span><span class="o">**</span><span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">egg_box</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">mode_width</span><span class="o">=</span><span class="n">mode_width</span><span class="p">,</span> <span class="n">box_size</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">eggbox</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">mode_width</span><span class="o">=</span><span class="n">mode_width</span><span class="p">,</span> <span class="n">box_size</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 
-<span class="k">def</span> <span class="nf">sample_annealed_egg_box</span><span class="p">(</span><span class="n">beta</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">vmap</span><span class="p">(</span><span class="k">lambda</span> <span class="n">beta</span><span class="p">:</span> <span class="n">annealed_egg_box</span><span class="p">(</span><span class="n">beta</span><span class="p">)</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1</span><span class="p">,)),</span> <span class="n">randomness</span><span class="o">=</span><span class="s2">&quot;different&quot;</span><span class="p">)(</span><span class="n">beta</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">sample_annealed_eggbox</span><span class="p">(</span><span class="n">beta</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">vmap</span><span class="p">(</span><span class="k">lambda</span> <span class="n">beta</span><span class="p">:</span> <span class="n">annealed_eggbox</span><span class="p">(</span><span class="n">beta</span><span class="p">)</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1</span><span class="p">,)),</span> <span class="n">randomness</span><span class="o">=</span><span class="s2">&quot;different&quot;</span><span class="p">)(</span><span class="n">beta</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
 
 <span class="k">def</span> <span class="nf">annealed_logp</span><span class="p">(</span><span class="n">beta</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">annealed_egg_box</span><span class="p">(</span><span class="n">beta</span><span class="p">)</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">annealed_eggbox</span><span class="p">(</span><span class="n">beta</span><span class="p">)</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
 
 <span class="k">def</span> <span class="nf">annealed_score</span><span class="p">(</span><span class="n">beta</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">vmap</span><span class="p">(</span><span class="n">grad</span><span class="p">(</span><span class="n">annealed_logp</span><span class="p">,</span> <span class="n">argnums</span><span class="o">=</span><span class="mi">1</span><span class="p">))(</span><span class="n">beta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
@@ -725,7 +725,7 @@ Also, to make the task easier for the neural network, we redefine the score to i
 <span class="n">losses</span> <span class="o">=</span> <span class="p">[]</span>
 <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">)):</span>
     <span class="n">beta</span> <span class="o">=</span> <span class="mi">10</span><span class="o">**</span><span class="p">(</span><span class="o">-</span> <span class="mi">3</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="n">B</span><span class="p">))</span>                    <span class="c1"># β ~ LogU(10^-3, 1)</span>
-    <span class="n">x</span> <span class="o">=</span> <span class="n">sample_annealed_egg_box</span><span class="p">(</span><span class="n">beta</span><span class="p">)</span>                   <span class="c1"># x ~ p_β(x)</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">sample_annealed_eggbox</span><span class="p">(</span><span class="n">beta</span><span class="p">)</span>                   <span class="c1"># x ~ p_β(x)</span>
     <span class="n">loss</span> <span class="o">=</span> <span class="n">annealed_score_matching_loss</span><span class="p">(</span><span class="n">beta</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">net</span><span class="p">)</span>   <span class="c1"># loss = E_{β, x} [β^{-1}||∇log p_β(x) - s_θ(β, x)||^2]</span>
     <span class="n">optim</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">()</span>
     <span class="n">loss</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
@@ -735,7 +735,7 @@ Also, to make the task easier for the neural network, we redefine the score to i
 </div>
 </div>
 <div class="cell_output docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "425e55315af84e4181cc8782b7be7e82", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "a6a5e326ce90477a8de86c45967a3030", "version_major": 2, "version_minor": 0}</script></div>
 </details>
 </div>
 <div class="cell tag_hide-input docutils container">
@@ -755,7 +755,7 @@ Also, to make the task easier for the neural network, we redefine the score to i
 </div>
 </details>
 <div class="cell_output docutils container">
-<img alt="../_images/163c5bd64f170a40cb0d780f22f8a336c9f34216d7a641661d82b79a7168602d.png" src="../_images/163c5bd64f170a40cb0d780f22f8a336c9f34216d7a641661d82b79a7168602d.png" />
+<img alt="../_images/939435422a2340de5ac803f0395fbbbd11956c81db1d0c2cc9260be6e8100f10.png" src="../_images/939435422a2340de5ac803f0395fbbbd11956c81db1d0c2cc9260be6e8100f10.png" />
 </div>
 </div>
 <div class="cell tag_hide-input docutils container">
@@ -771,7 +771,7 @@ Also, to make the task easier for the neural network, we redefine the score to i
 <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">4</span><span class="p">):</span>
     <span class="n">beta</span> <span class="o">=</span> <span class="p">[</span><span class="mf">1e-3</span><span class="p">,</span> <span class="mf">1e-2</span><span class="p">,</span> <span class="mf">1e-1</span><span class="p">,</span> <span class="mf">1.</span><span class="p">][</span><span class="n">i</span><span class="p">]</span>
     <span class="n">ax</span> <span class="o">=</span> <span class="n">axs</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span>
-    <span class="n">plot_density</span><span class="p">(</span><span class="n">annealed_egg_box</span><span class="p">(</span><span class="n">beta</span><span class="p">)</span><span class="o">.</span><span class="n">log_prob</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span> <span class="n">extent</span><span class="o">=</span><span class="n">extent</span><span class="p">)</span>
+    <span class="n">plot_density</span><span class="p">(</span><span class="n">annealed_eggbox</span><span class="p">(</span><span class="n">beta</span><span class="p">)</span><span class="o">.</span><span class="n">log_prob</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span> <span class="n">extent</span><span class="o">=</span><span class="n">extent</span><span class="p">)</span>
     <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;$\beta = 10^{</span><span class="si">%d</span><span class="s2">}$&quot;</span> <span class="o">%</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">beta</span><span class="p">))</span>
     <span class="n">ax</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s2">&quot;off&quot;</span><span class="p">)</span>
 
@@ -784,18 +784,18 @@ Also, to make the task easier for the neural network, we redefine the score to i
     <span class="n">score_fn</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">net</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="n">beta</span><span class="p">])</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="n">x</span><span class="p">)</span><span class="o">/</span><span class="n">beta</span><span class="o">**</span><span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span>
     <span class="n">plot_score</span><span class="p">(</span><span class="n">score_fn</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span> <span class="n">extent</span><span class="o">=</span><span class="n">extent</span><span class="p">)</span>
     <span class="n">ax</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s2">&quot;off&quot;</span><span class="p">);</span>
-<span class="n">axs</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">annotate</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;$p_{\beta}(\mathbf</span><span class="si">{x}</span><span class="s2">)$&quot;</span><span class="p">,</span> <span class="p">(</span><span class="o">-</span><span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">),</span> 
-    <span class="n">xycoords</span><span class="o">=</span><span class="s2">&quot;axes fraction&quot;</span><span class="p">,</span> <span class="n">va</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">,</span> <span class="n">ha</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">,</span> <span class="n">rotation</span><span class="o">=</span><span class="mi">90</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">24</span><span class="p">)</span>
-<span class="n">axs</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">annotate</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;$\beta^{-1}\nabla_{\mathbf</span><span class="si">{x}</span><span class="s2">} \log p_{\beta}(\mathbf</span><span class="si">{x}</span><span class="s2">)$&quot;</span><span class="p">,</span> <span class="p">(</span><span class="o">-</span><span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">),</span> 
-    <span class="n">xycoords</span><span class="o">=</span><span class="s2">&quot;axes fraction&quot;</span><span class="p">,</span> <span class="n">va</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">,</span> <span class="n">ha</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">,</span> <span class="n">rotation</span><span class="o">=</span><span class="mi">90</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">24</span><span class="p">)</span>
-<span class="n">axs</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">annotate</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;$\beta^{-1}\mathbf</span><span class="si">{s}</span><span class="s2">_\theta(\beta, \mathbf</span><span class="si">{x}</span><span class="s2">)$&quot;</span><span class="p">,</span> <span class="p">(</span><span class="o">-</span><span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">),</span>
-    <span class="n">xycoords</span><span class="o">=</span><span class="s2">&quot;axes fraction&quot;</span><span class="p">,</span> <span class="n">va</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">,</span> <span class="n">ha</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">,</span> <span class="n">rotation</span><span class="o">=</span><span class="mi">90</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">24</span><span class="p">);</span>
+<span class="n">axs</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">annotate</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;$p_{\beta}(\bm</span><span class="si">{x}</span><span class="s2">)$&quot;</span><span class="p">,</span> <span class="p">(</span><span class="o">-</span><span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">),</span> 
+    <span class="n">xycoords</span><span class="o">=</span><span class="s2">&quot;axes fraction&quot;</span><span class="p">,</span> <span class="n">va</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">,</span> <span class="n">ha</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">,</span> <span class="n">rotation</span><span class="o">=</span><span class="mi">90</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+<span class="n">axs</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">annotate</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;$\beta^{-1}\grad_{\bm</span><span class="si">{x}</span><span class="s2">} \log p_{\beta}(\bm</span><span class="si">{x}</span><span class="s2">)$&quot;</span><span class="p">,</span> <span class="p">(</span><span class="o">-</span><span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">),</span> 
+    <span class="n">xycoords</span><span class="o">=</span><span class="s2">&quot;axes fraction&quot;</span><span class="p">,</span> <span class="n">va</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">,</span> <span class="n">ha</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">,</span> <span class="n">rotation</span><span class="o">=</span><span class="mi">90</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+<span class="n">axs</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">annotate</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;$\beta^{-1}\bm</span><span class="si">{s}</span><span class="s2">_\theta(\beta, \bm</span><span class="si">{x}</span><span class="s2">)$&quot;</span><span class="p">,</span> <span class="p">(</span><span class="o">-</span><span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">),</span>
+    <span class="n">xycoords</span><span class="o">=</span><span class="s2">&quot;axes fraction&quot;</span><span class="p">,</span> <span class="n">va</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">,</span> <span class="n">ha</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">,</span> <span class="n">rotation</span><span class="o">=</span><span class="mi">90</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">20</span><span class="p">);</span>
 </pre></div>
 </div>
 </div>
 </details>
 <div class="cell_output docutils container">
-<img alt="../_images/4bdd1331cec4ffd4516d97b5c95b18fefc11bf8b592e6e44200c3dc146f9e5ad.png" src="../_images/4bdd1331cec4ffd4516d97b5c95b18fefc11bf8b592e6e44200c3dc146f9e5ad.png" />
+<img alt="../_images/3b996d420e48493f907ec1ea66843f2efbbf60b83f6632fb126d8fe3ed2776ef.png" src="../_images/3b996d420e48493f907ec1ea66843f2efbbf60b83f6632fb126d8fe3ed2776ef.png" />
 </div>
 </div>
 <p>Not so bad. The model is able to accurately capture the score for a wide range of values for <span class="math notranslate nohighlight">\(\beta\)</span>. It is also much more precise in regions of low density compared to our previous attempts.</p>
@@ -832,17 +832,17 @@ Also, to make the task easier for the neural network, we redefine the score to i
 \[
     t_1 &lt; t_2 \implies \sigma(t_1) &lt; \sigma(t_2)
 \]</div>
-<p>To connect with the previous section, let’s work out what the annealed distribution is. Let’s write <span class="math notranslate nohighlight">\(p_t(\mathbf{x}_t)\)</span> in terms of the empirical distribution <span class="math notranslate nohighlight">\(p(\mathbf{x}_0)\)</span> and the Gaussian perturbation kernel <span class="math notranslate nohighlight">\(p(\mathbf{x}_t \mid \mathbf{x}_0)\)</span></p>
+<p>Let’s write the annealed distribution <span class="math notranslate nohighlight">\(p(\mathbf{x}_t)\)</span> — analoguous to <span class="math notranslate nohighlight">\(p_\beta(\mathbf{x})\)</span> — in terms of the empirical distribution <span class="math notranslate nohighlight">\(p(\mathbf{x}_0)\)</span> and the Gaussian perturbation kernel <span class="math notranslate nohighlight">\(p(\mathbf{x}_t \mid \mathbf{x}_0)\)</span></p>
 <div class="math notranslate nohighlight">
 \[\begin{split}
 \begin{align*}
-    p_t(\mathbf{x}_t) &amp;= \int_\mathcal{X} p(\mathbf{x}_0) p(\mathbf{x}_t \mid \mathbf{x}_0)\, \mathrm{d} \mathbf{x}_0 \\
+    p(\mathbf{x}_t) &amp;= \int_\mathcal{X} p(\mathbf{x}_0) p(\mathbf{x}_t \mid \mathbf{x}_0)\, \mathrm{d} \mathbf{x}_0 \\
                     &amp;= \int_\mathcal{X} \sum_{i=1}^N \delta^{(n)}(\mathbf{x}_0 - \mathbf{x}^{(i)}_0)p(\mathbf{x}_t \mid \mathbf{x}_0)\, \mathrm{d} \mathbf{x}_0 \\
                     &amp;= \sum_{i=1}^N p(\mathbf{x}_t \mid \mathbf{x}^{(i)}_0) \\
                     &amp;= \sum_{i=1}^N \mathcal{N}(\mathbf{x}_t \mid \mathbf{x}_0^{(i)}, \sigma^2(t))
 \end{align*}
 \end{split}\]</div>
-<p>What this tells us is that adding noise to samples from the empirical distribution produces an annealed distribution, <span class="math notranslate nohighlight">\(p_t(\mathbf{x}_t)\)</span>, which is a mixture of Gaussian modes around each samples from the dataset.
+<p>What this tells us is that adding noise to samples from the empirical distribution produces an annealed distribution, <span class="math notranslate nohighlight">\(p(\mathbf{x}_t)\)</span>, which is a mixture of Gaussian modes around each samples from the dataset.
 The width of these modes is increased as a function of <span class="math notranslate nohighlight">\(t\)</span>. This is analogous to how our previous example was annealed by decreasing values of <span class="math notranslate nohighlight">\(\beta\)</span>.</p>
 </section>
 <section id="dsm-equivalence-with-sm">
@@ -853,7 +853,7 @@ Let’s recall the SM loss, now written in terms of <span class="math notranslat
 \[
     \mathcal{L}^{\mathrm{SM}}_\theta = \mathbb{E}_{p(t)}\mathbb{E}_{p_t(\mathbf{x}_t)}
     \bigg[
-        \lambda(t)\big\lVert \mathbf{s}_\theta(t, \mathbf{x}_t) - \nabla_{\mathbf{x}_t} \log p_t(\mathbf{x}_t) \big\rVert^2_2
+        \lambda(t)\big\lVert \mathbf{s}_\theta(t, \mathbf{x}_t) - \nabla_{\mathbf{x}_t} \log p(\mathbf{x}_t) \big\rVert^2_2
     \bigg]
 \]</div>
 <p>Our empirical description for the target score of <span class="math notranslate nohighlight">\(p_t(\mathbf{x}_t)\)</span> is defined as a sum over the entire dataset <span class="math notranslate nohighlight">\(\mathcal{D}\)</span>. In practice, a dataset is often too large to fit into the fast-access memory of the hardware used to train the neural network model. Typical datasets with images can easily contain from <span class="math notranslate nohighlight">\(10\, \mathrm{GB}\)</span> to more than <span class="math notranslate nohighlight">\(1\, \mathrm{TB}\)</span> of data.
@@ -861,10 +861,10 @@ In the future, hardware could perhaps handle this situation. But, to my knowledg
 <p><a class="reference external" href="https://www.iro.umontreal.ca/~vincentp/Publications/smdae_techreport.pdf">P. Vincent (2011)</a> defined a loss function completely equivalent to the one above with a clever manipulation. The argument goes as follows. First, develop the squared norm and collect every terms that do not depend on <span class="math notranslate nohighlight">\(\theta\)</span> in a constant, <span class="math notranslate nohighlight">\(C\)</span>. This constant represent all terms that do not impact the learning problem, specifically those that do not depend on <span class="math notranslate nohighlight">\(\theta\)</span>. Indeed, minimizing <span class="math notranslate nohighlight">\(\mathcal{L}_\theta\)</span> w.r.t. <span class="math notranslate nohighlight">\(\theta\)</span> involves taking the gradient <span class="math notranslate nohighlight">\(\nabla_\theta\)</span>, which will make all such terms vanish.</p>
 <div class="math notranslate nohighlight">
 \[
-    \mathcal{L}^{\mathrm{SM}}_\theta = \mathbb{E}_{p(t)}\mathbb{E}_{p_t(\mathbf{x}_t)}
+    \mathcal{L}^{\mathrm{SM}}_\theta = \mathbb{E}_{p(t)}\mathbb{E}_{p(\mathbf{x}_t)}
     \bigg[
         \lambda(t)\big\lVert \mathbf{s}_\theta(t, \mathbf{x}_t) \big\rVert^2_2
-        - 2\lambda(t) \mathbf{s}_\theta(t, \mathbf{x}_t) \cdot \nabla_{\mathbf{x}_t} \log p_t(\mathbf{x}_t) 
+        - 2\lambda(t) \mathbf{s}_\theta(t, \mathbf{x}_t) \cdot \nabla_{\mathbf{x}_t} \log p(\mathbf{x}_t) 
     \bigg]
     + C
 \]</div>
@@ -872,26 +872,26 @@ In the future, hardware could perhaps handle this situation. But, to my knowledg
 <div class="math notranslate nohighlight">
 \[\begin{split}
     \begin{align*}
-        \mathbb{E}_{p_t(\mathbf{x}_t)}
+        \mathbb{E}_{p(\mathbf{x}_t)}
             \bigg[ 
-                 \mathbf{s}_\theta(t, \mathbf{x}_t) \cdot \nabla_{\mathbf{x}_t} \log p_t(\mathbf{x}_t)
+                 \mathbf{s}_\theta(t, \mathbf{x}_t) \cdot \nabla_{\mathbf{x}_t} \log p(\mathbf{x}_t)
             \bigg]
             &amp;= 
-             \int_{\mathbf{x}_t} \, p_t(\mathbf{x}_t)
+             \int_{\mathbf{x}_t} \, p(\mathbf{x}_t)
             \,
-            \mathbf{s}_\theta(t, \mathbf{x}_t) \cdot \nabla_{\mathbf{x}_t} \log p_t(\mathbf{x}_t)  \\
+            \mathbf{s}_\theta(t, \mathbf{x}_t) \cdot \nabla_{\mathbf{x}_t} \log p(\mathbf{x}_t)  \\
             &amp;= 
-             \int_{\mathbf{x}_t} \, p_t(\mathbf{x}_t)
+             \int_{\mathbf{x}_t} \, p(\mathbf{x}_t)
             \,
-            \mathbf{s}_\theta(t, \mathbf{x}_t) \cdot \frac{1}{p_t(\mathbf{x}_t)}\nabla_{\mathbf{x}_t} p_t(\mathbf{x}_t)  \\
-            &amp;= 
-              \int_{\mathbf{x}_t}
-            \,
-            \mathbf{s}_\theta(t, \mathbf{x}_t) \cdot \nabla_{\mathbf{x}_t} \int_{\mathbf{x}_0} p_t(\mathbf{x}_t, \mathbf{x}_0)\\
+            \mathbf{s}_\theta(t, \mathbf{x}_t) \cdot \frac{1}{p(\mathbf{x}_t)}\nabla_{\mathbf{x}_t} p(\mathbf{x}_t)  \\
             &amp;= 
               \int_{\mathbf{x}_t}
             \,
-            \mathbf{s}_\theta(t, \mathbf{x}_t) \cdot \nabla_{\mathbf{x}_t}  \int_{\mathbf{x}_0} p_0(\mathbf{x}_0)  p(\mathbf{x}_t \mid \mathbf{x}_0)\\
+            \mathbf{s}_\theta(t, \mathbf{x}_t) \cdot \nabla_{\mathbf{x}_t} \int_{\mathbf{x}_0} p(\mathbf{x}_t, \mathbf{x}_0)\\
+            &amp;= 
+              \int_{\mathbf{x}_t}
+            \,
+            \mathbf{s}_\theta(t, \mathbf{x}_t) \cdot   \int_{\mathbf{x}_0} p(\mathbf{x}_0) \nabla_{\mathbf{x}_t} p(\mathbf{x}_t \mid \mathbf{x}_0)\\
             &amp;= 
              \int_{\mathbf{x}_t}
             \,
@@ -910,7 +910,7 @@ In the future, hardware could perhaps handle this situation. But, to my knowledg
             \nabla_{\mathbf{x}_t} \log p(\mathbf{x}_t \mid \mathbf{x}_0) \bigg] \\
     \end{align*}
 \end{split}\]</div>
-<p>Now, inserting this term back into the previous expression and completing the square, we obtain a new objective</p>
+<p>Now, inserting this term back into the previous expression and completing the square, we obtain a new objective (ignoring all constants)</p>
 <div class="math notranslate nohighlight">
 \[
     \mathcal{L}^{\mathrm{DSM}}_\theta = \mathbb{E}_{p(t)}\mathbb{E}_{p(\mathbf{x}_t, \mathbf{x}_0)}
@@ -920,7 +920,7 @@ In the future, hardware could perhaps handle this situation. But, to my knowledg
         \big\rVert^2_2
     \bigg]\, .
 \]</div>
-<p>Both objectives yield the same score function <span class="math notranslate nohighlight">\(\mathbf{s}_{\theta^\star}(t, \mathbf{x}_t)\)</span> at their optimum <span class="math notranslate nohighlight">\(\theta^\star\)</span>. However, this new objective is much more efficient because it uses <span class="math notranslate nohighlight">\(\nabla_{\mathbf{x}_t} \log p(\mathbf{x}_t \mid \mathbf{x}_0)\)</span>, and not <span class="math notranslate nohighlight">\(\nabla_{\mathbf{x}_t} \log p_t(\mathbf{x}_t)\)</span>. Indeed, <span class="math notranslate nohighlight">\(p_t(\mathbf{x}_t)\)</span> is often intractable, whereas the Gaussian perturbation kernel is trivial to evaluate. Its score is</p>
+<p>Both objectives yield the same score function <span class="math notranslate nohighlight">\(\mathbf{s}_{\theta^\star}(t, \mathbf{x}_t)\)</span> at their optimum <span class="math notranslate nohighlight">\(\theta^\star\)</span>. However, this new objective is much more efficient because it uses <span class="math notranslate nohighlight">\(\nabla_{\mathbf{x}_t} \log p(\mathbf{x}_t \mid \mathbf{x}_0)\)</span>, and not <span class="math notranslate nohighlight">\(\nabla_{\mathbf{x}_t} \log p(\mathbf{x}_t)\)</span>. Indeed, <span class="math notranslate nohighlight">\(p(\mathbf{x}_t)\)</span> is often intractable, whereas the Gaussian perturbation kernel is trivial to evaluate. Its score is</p>
 <div class="math notranslate nohighlight">
 \[
     \nabla_{\mathbf{x}_t} \log p(\mathbf{x}_t \mid \mathbf{x}_0) = - \frac{\mathbf{x}_t - \mathbf{x}_0}{\sigma^2(t)}\, .
@@ -933,7 +933,7 @@ In the future, hardware could perhaps handle this situation. But, to my knowledg
 <p>After we redefine the score function to make the learning problem easier for the neural network</p>
 <div class="math notranslate nohighlight">
 \[
-    \mathbf{s}_\theta(t, \mathbf{x}_t) \equiv \frac{\boldsymbol{\epsilon}_\theta(t, \mathbf{x}_t)}{\sigma(t)}\, ,
+    \mathbf{s}_\theta(t, \mathbf{x}) \equiv \frac{\boldsymbol{\epsilon}_\theta(t, \mathbf{x})}{\sigma(t)}\, ,
 \]</div>
 <p>the loss function becomes — setting <span class="math notranslate nohighlight">\(\lambda(t) = \sigma(t)\)</span> as the weight</p>
 <div class="math notranslate nohighlight">
@@ -956,10 +956,6 @@ In the future, hardware could perhaps handle this situation. But, to my knowledg
 <section id="dsm-in-practice">
 <h3>DSM in practice<a class="headerlink" href="#dsm-in-practice" title="Link to this heading">#</a></h3>
 <p>One thing about DSM that can be confusing at first is the behavior of the loss function. Don’t try to read too much into it. The loss function is not supposed to reach 0. And it is normal that it oscillates a lot. To compensate for this, we use a neat technique. Instead of saving the weights <span class="math notranslate nohighlight">\(\theta\)</span> of the neural network after a number of iterations, we save the exponential moving average (EMA) of the weight over the training.</p>
-<p>Here is little FAQ:</p>
-<p><strong>Q</strong>: Should I split the dataset into a training and validation set?
-<strong>A</strong>: No. The goal of training an SBM is to encode an empirical distribution defined by your samples. The concept of the generalization error is ill-defined in this setting.</p>
-<p><strong>Q</strong>: The loss has plateaued, should I stop training? <strong>A</strong>: No. The neural network is still learning, even while the loss reaches a plateau. Keep training with a constant learning rate for as long as you can afford it.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">D</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="mf">2e3</span><span class="p">)</span>  <span class="c1"># Number of samples in the dataset</span>
@@ -1000,8 +996,8 @@ In the future, hardware could perhaps handle this situation. But, to my knowledg
 <span class="n">N</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="mf">2e4</span><span class="p">)</span>  <span class="c1"># Number of iterations</span>
 <span class="n">B</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="mi">8</span><span class="p">)</span> <span class="c1"># Batch size</span>
 <span class="n">net</span> <span class="o">=</span> <span class="n">Epsilon</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
-<span class="n">optim</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">Adam</span><span class="p">(</span><span class="n">net</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="n">lr</span><span class="o">=</span><span class="mf">3e-4</span><span class="p">)</span>
-<span class="n">ema</span> <span class="o">=</span> <span class="n">ExponentialMovingAverage</span><span class="p">(</span><span class="n">net</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="n">decay</span><span class="o">=</span><span class="mf">0.999</span><span class="p">)</span>
+<span class="n">optim</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">Adam</span><span class="p">(</span><span class="n">net</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="n">lr</span><span class="o">=</span><span class="mf">5e-4</span><span class="p">)</span>
+<span class="n">ema</span> <span class="o">=</span> <span class="n">ExponentialMovingAverage</span><span class="p">(</span><span class="n">net</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="n">decay</span><span class="o">=</span><span class="mf">0.99</span><span class="p">)</span>
 
 <span class="n">losses</span> <span class="o">=</span> <span class="p">[]</span>
 <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">)):</span>
@@ -1019,7 +1015,7 @@ In the future, hardware could perhaps handle this situation. But, to my knowledg
 </div>
 </div>
 <div class="cell_output docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "9961e098a64d422aba8bebde412203c0", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "7ab21569b7354797aa48eff78a387de0", "version_major": 2, "version_minor": 0}</script></div>
 </details>
 </div>
 <div class="cell tag_hide-input docutils container">
@@ -1039,13 +1035,13 @@ In the future, hardware could perhaps handle this situation. But, to my knowledg
 </div>
 </details>
 <div class="cell_output docutils container">
-<img alt="../_images/c4b7b2610b6e2720eda77f9bb05628224d64480503e87a13e9a6357bd18c1e86.png" src="../_images/c4b7b2610b6e2720eda77f9bb05628224d64480503e87a13e9a6357bd18c1e86.png" />
+<img alt="../_images/20d5052925417d557f68ac5a5e0ae34d58c08295a17b2d16880da705a6590abc.png" src="../_images/20d5052925417d557f68ac5a5e0ae34d58c08295a17b2d16880da705a6590abc.png" />
 </div>
 </div>
-<p>We can compare our model against the annealed empirical distribution. Remember that</p>
+<p>We can compare our model against the annealed empirical distribution</p>
 <div class="math notranslate nohighlight">
 \[
-    p_t(\mathbf{x}_t) = \sum_{i=1}^N \mathcal{N}(\mathbf{x}_t \mid \mathbf{x}_0^{(i)}, \sigma^2(t))\, ,
+    p(\mathbf{x}_t) = \sum_{i=1}^N \mathcal{N}(\mathbf{x}_t \mid \mathbf{x}_0^{(i)}, \sigma^2(t))\, ,
 \]</div>
 <p>where <span class="math notranslate nohighlight">\(\mathbf{x}_0^{(i)} \in \mathcal{D}\)</span>.</p>
 <div class="cell docutils container">
@@ -1088,18 +1084,18 @@ In the future, hardware could perhaps handle this situation. But, to my knowledg
     <span class="n">score_fn</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">net</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="n">t</span><span class="p">])</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="n">x</span><span class="p">)</span> <span class="o">*</span> <span class="n">sigma</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
     <span class="n">plot_score</span><span class="p">(</span><span class="n">score_fn</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span> <span class="n">extent</span><span class="o">=</span><span class="n">extent</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
     <span class="n">ax</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s2">&quot;off&quot;</span><span class="p">);</span>
-<span class="n">axs</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">annotate</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;$p_</span><span class="si">{t}</span><span class="s2">(\mathbf</span><span class="si">{x}</span><span class="s2">_t)$&quot;</span><span class="p">,</span> <span class="p">(</span><span class="o">-</span><span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">),</span> 
+<span class="n">axs</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">annotate</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;$p(\mathbf</span><span class="si">{x}</span><span class="s2">_t)$&quot;</span><span class="p">,</span> <span class="p">(</span><span class="o">-</span><span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">),</span> 
     <span class="n">xycoords</span><span class="o">=</span><span class="s2">&quot;axes fraction&quot;</span><span class="p">,</span> <span class="n">va</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">,</span> <span class="n">ha</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">,</span> <span class="n">rotation</span><span class="o">=</span><span class="mi">90</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">24</span><span class="p">)</span>
-<span class="n">axs</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">annotate</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;$\sigma^2(t)\nabla_{\mathbf</span><span class="si">{x}</span><span class="s2">_t} \log p_</span><span class="si">{t}</span><span class="s2">(\mathbf</span><span class="si">{x}</span><span class="s2">_t)$&quot;</span><span class="p">,</span> <span class="p">(</span><span class="o">-</span><span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">),</span> 
+<span class="n">axs</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">annotate</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;$\sigma^2(t)\nabla_{\mathbf</span><span class="si">{x}</span><span class="s2">_t} \log p(\mathbf</span><span class="si">{x}</span><span class="s2">_t)$&quot;</span><span class="p">,</span> <span class="p">(</span><span class="o">-</span><span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">),</span> 
     <span class="n">xycoords</span><span class="o">=</span><span class="s2">&quot;axes fraction&quot;</span><span class="p">,</span> <span class="n">va</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">,</span> <span class="n">ha</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">,</span> <span class="n">rotation</span><span class="o">=</span><span class="mi">90</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">24</span><span class="p">)</span>
-<span class="n">axs</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">annotate</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;$\sigma^2(t)\mathbf</span><span class="si">{s}</span><span class="s2">_\theta(t, \mathbf</span><span class="si">{x}</span><span class="s2">_t)$&quot;</span><span class="p">,</span> <span class="p">(</span><span class="o">-</span><span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">),</span>
+<span class="n">axs</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">annotate</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;$\sigma^2(t)\mathbf</span><span class="si">{s}</span><span class="s2">_\theta(t, \mathbf</span><span class="si">{x}</span><span class="s2">)$&quot;</span><span class="p">,</span> <span class="p">(</span><span class="o">-</span><span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">),</span>
     <span class="n">xycoords</span><span class="o">=</span><span class="s2">&quot;axes fraction&quot;</span><span class="p">,</span> <span class="n">va</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">,</span> <span class="n">ha</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">,</span> <span class="n">rotation</span><span class="o">=</span><span class="mi">90</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">24</span><span class="p">);</span>
 </pre></div>
 </div>
 </div>
 </details>
 <div class="cell_output docutils container">
-<img alt="../_images/4fa0844cc12d5ee5e0b5368032853dcb207369072dd697deb8103354e789d911.png" src="../_images/4fa0844cc12d5ee5e0b5368032853dcb207369072dd697deb8103354e789d911.png" />
+<img alt="../_images/ac4afe7750bf119ec4765e01f647550c607e756f16768d17b85b9caeb7db805c.png" src="../_images/ac4afe7750bf119ec4765e01f647550c607e756f16768d17b85b9caeb7db805c.png" />
 </div>
 </div>
 </section>
