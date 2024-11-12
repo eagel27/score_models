@@ -87,7 +87,7 @@ def checkerboard(squares: int = 4, size: float = None) -> tfd.Distribution:
     return tfd.MixtureSameFamily(mixture, component, validate_args=False)
 
 
-def egg_box(
+def eggbox(
         modes: int = 16, 
         mode_width: float = 0.5, 
         box_size: float = None, 
@@ -116,3 +116,29 @@ def egg_box(
     return tfd.MixtureSameFamily(mixture, component, validate_args=False)
 
 
+def two_modes1D(mode_width=0.3, weights=None, mode_distance=1):
+    """
+    Returns a distribution with two modes
+    """
+    if weights is None:
+        weights = torch.tensor([0.5, 0.5]).to(DEVICE)
+    elif not isinstance(weights, torch.Tensor):
+        weights = torch.tensor(weights).to(DEVICE)
+    coords = torch.tensor([[-.5, .5]]).T.to(DEVICE) * mode_distance
+    mixture = tfd.Categorical(probs=weights, validate_args=False)
+    component = tfd.Independent(tfd.Normal(loc=coords, scale=mode_width, validate_args=False), 1)
+    return tfd.MixtureSameFamily(mixture, component, validate_args=False)
+
+
+def two_modes2D(mode_width=0.3, weights=None):
+    """
+    Returns a distribution with two modes
+    """
+    coords = torch.tensor([[-0.5, 0.], [0.5, -0.]]).to(DEVICE)
+    if weights is None:
+        weights = torch.tensor([0.5, 0.5]).to(DEVICE)
+    elif not isinstance(weights, torch.Tensor):
+        weights = torch.tensor(weights).to(DEVICE)
+    mixture = tfd.Categorical(probs=weights, validate_args=False)
+    component = tfd.Independent(tfd.Normal(loc=coords.to(DEVICE), scale=mode_width, validate_args=False), 1)
+    return tfd.MixtureSameFamily(mixture, component, validate_args=False)
