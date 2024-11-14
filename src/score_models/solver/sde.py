@@ -132,26 +132,24 @@ class EMSDESolver(SDESolver):
     """
     Base solver for a stochastic differential equation (SDE) using the Euler-Maruyama method.
     """
-
     def step(self, t, x, args, dt, forward, **kwargs):
-        """base SDE solver"""
         dw = torch.randn_like(x) * torch.sqrt(dt.abs())
         return self.dx(t, x, args, dt, forward, dw, **kwargs)
 
 
 class HeunSDESolver(SDESolver):
+    """
+    Base SDE solver using a 2nd order Runge-Kutta method. For more
+    details see Equation 2.5 in chapter 7.2 of the book "Introduction to
+    Stochastic Differential Equations" by Thomas C. Gard. 
+    
+    This solver adopts the Stratonovich interpretation of the SDE, 
+    though we note that the interpretation does not affect our package 
+    because our diffusion coefficient are homogeneous, i.e. they do not depend on x. 
+    The dependence of sde.diffusion on x is artificial in that it's only used 
+    to infer the shape of the state space.
+    """
     def step(self, t, x, args, dt, forward, **kwargs):
-        """
-        Base SDE solver using a 2nd order Runge-Kutta method. For more
-        details see Equation 2.5 in chapter 7.2 of the book "Introduction to
-        Stochastic Differential Equations" by Thomas C. Gard. 
-        
-        This solver adopts the Stratonovich interpretation of the SDE, 
-        though we note that the interpretation does not affect our package 
-        because our diffusion coefficient are homogeneous, i.e. they do not depend on x. 
-        The dependence of sde.diffusion on x is artificial in that it's only used 
-        to infer the shape of the state space.
-        """
         z = torch.randn_like(x)
         dw = z * torch.sqrt(dt.abs())
         k1 = self.dx(t, x, args, dt, forward, dw, **kwargs)
@@ -160,17 +158,17 @@ class HeunSDESolver(SDESolver):
 
 
 class RK4SDESolver(SDESolver):
+    """Base SDE solver using a 4th order Runge-Kutta method. For more
+    details see Equation 3.6 in chapter 7.3 of the book "Introduction to
+    Stochastic Differential Equations" by Thomas C. Gard. 
+    
+    This solver adopts the Stratonovich interpretation of the SDE, 
+    though we note that the interpretation does not affect our package 
+    because our diffusion coefficient are homogeneous, i.e. they do not depend on x. 
+    The dependence of sde.diffusion on x is artificial in that it's only used 
+    to infer the shape of the state space.
+    """
     def step(self, t, x, args, dt, forward, **kwargs):
-        """Base SDE solver using a 4th order Runge-Kutta method. For more
-        details see Equation 3.6 in chapter 7.3 of the book "Introduction to
-        Stochastic Differential Equations" by Thomas C. Gard. 
-        
-        This solver adopts the Stratonovich interpretation of the SDE, 
-        though we note that the interpretation does not affect our package 
-        because our diffusion coefficient are homogeneous, i.e. they do not depend on x. 
-        The dependence of sde.diffusion on x is artificial in that it's only used 
-        to infer the shape of the state space.
-        """
         z = torch.randn_like(x)
         dw = z * torch.sqrt(dt.abs())
         k1 = self.dx(t, x, args, dt, forward, dw, **kwargs)

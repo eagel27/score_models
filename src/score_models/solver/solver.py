@@ -33,7 +33,8 @@ class Solver(ABC):
         if solver is not None:
             SOLVERS = all_subclasses(cls)
             try:
-                return super(Solver, cls).__new__(SOLVERS[solver.lower()])
+                # Removed arguments from super to fix autoreload bug in jupyter notebooks
+                return super().__new__(SOLVERS[solver.lower()])
             except KeyError:
                 raise ValueError(
                     f'Unknown solver type: "{solver}". Must be one of {list(filter(lambda s: "_" in s, SOLVERS.keys()))}'

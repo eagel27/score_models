@@ -5,6 +5,7 @@ from torch.nn import Module
 import torch
 
 from .base import Base
+# from .edm_score_model import EDMScoreModel
 from ..sde import SDE
 from ..losses import dsm
 from ..solver import Solver, ODESolver
@@ -17,6 +18,15 @@ __all__ = ["ScoreModel"]
 
 
 class ScoreModel(Base):
+    # Idea, though need to make sure we can make a transition to EDM as default that do not break old models
+    # def __new__(cls, *args, formulation: Literal["original", "edm"] = "original", **kwargs):
+        # if formulation.lower() == "edm":
+            # # Instantion with the EDM formalism
+            # return EDMScoreModel(*args, **kwargs)
+        # else:
+            # # Normal instantiation
+            # return super().__new__(cls)
+
     def __init__(
         self,
         net: Optional[Union[str, Module]] = None,

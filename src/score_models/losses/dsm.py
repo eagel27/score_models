@@ -1,4 +1,4 @@
-from typing import Union, TYPE_CHECKING
+from typing import Union, TYPE_CHECKING, Literal
 if TYPE_CHECKING:
     from score_models import ScoreModel, HessianDiagonal
 
@@ -7,7 +7,8 @@ from contextlib import nullcontext
 import torch
 
 __all__ = [
-        "dsm", 
+        "dsm",
+        "edm_dsm",
         "denoising_score_matching", 
         "second_order_dsm", 
         "second_order_dsm_meng_variation",
@@ -16,6 +17,9 @@ __all__ = [
 
 
 def dsm(model: "ScoreModel", x: Tensor, *args: list[Tensor], **kwargs):
+    """
+    Original preconditioning used by Yang Song and Jonathan Ho.
+    """
     B, *D = x.shape
     sde = model.sde
     
@@ -31,11 +35,44 @@ def dsm(model: "ScoreModel", x: Tensor, *args: list[Tensor], **kwargs):
     epsilon_theta = model.reparametrized_score(t, xt, *args)                       # epsilon_theta(t, x) = sigma(t) * s(t, x)
     return ((epsilon_theta + z)**2).sum() / (2 * B)
 
+def edm_dsm(model: "ScoreModel", x: Tensor, *args: list[Tensor], **kwargs):
+    """
+    Desnoing Score Matching loss used by Tero Karras in his EDM formulation. 
+    The idea is to use the Tweedie formula to train the score, and define 
+    skip connection to stabilize the training at all temperatures.
+    
+    We also make use of a user defined sampling distribution for the time 
+    index. This is used to improve significanlty the convergence of the model,
+    by sampling more example in the spin-glass phase transition of the distribution.
+    """
+    B, *D = x.shape
+    sde = model.sde
+    
+    t = torch.rand(B).to(model.device) * (sde.T - sde.epsilon) + sde.epsilon       # t ~ U(epsilon, T)
+    z = torch.randn_like(x)                                                        # z ~ N(0, 1)
+    
+    # Sample from the marginal at time t using the Gaussian perturbation kernel
+    mu = sde.mu(t).view(-1, *[1]*len(D))
+    sigma = sde.sigma(t).view(-1, *[1]*len(D))
+    xt = mu * x + sigma * z                                                        # xt ~ p(xt | x0)
+    
+    # Denoising loss
+    F_theta = model.reparametrized_score(t, xt, *args)
+    c_out = model.sde.c_out(t).view(B, *[1]*len(D))
+    c_skip = model.sde.c_skip(t).view(B, *[1]*len(D))
+    effective_score = 1/c_out * (x - c_skip * xt)
+    return ((F_theta - effective_score)**2).sum() / (2 * B)
 
-def denoising_score_matching(model: "ScoreModel", x: Tensor, *args: list[Tensor], **kwargs):
-    # Used for backward compatibility
-    return dsm(model, x, *args)
-
+def denoising_score_matching(
+        model: "ScoreModel", 
+        x: Tensor, 
+        *args: list[Tensor], 
+        formulation: Literal["original", "edm"] = "edm", 
+        **kwargs):
+    if formulation == "original":
+        return dsm(model, x, *args)
+    elif formulation == "edm":
+        return edm_dsm(model, x, *args)
 
 # Note Meng's version is completely equivalent to Lu's version coded here
 def second_order_dsm(model: "HessianDiagonal", x: Tensor, *args: list[Tensor], no_grad: bool = True, **kwargs):

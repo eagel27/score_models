@@ -42,7 +42,6 @@ class VPSDE(SDE):
             {"beta_min": beta_min, "beta_max": beta_max}
         )
 
-
     def beta_primitive(self, t: Tensor) -> Tensor:
         """
         See equation (33) in Song et al 2020. (https://arxiv.org/abs/2011.13456)
