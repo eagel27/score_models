@@ -147,7 +147,7 @@ def test_loading_different_sdes():
     assert score.sde.beta == 10
 
 
-@pytest.mark.parametrize("method", ["euler_ode", "rk2_ode", "rk4_ode"])
+@pytest.mark.parametrize("method", ["Euler", "Heun", "RK4"])
 @pytest.mark.parametrize("steps", [10, 20])
 @pytest.mark.parametrize("cotangent_vectors", [1, 5, 10])
 def test_log_prob(method, steps, cotangent_vectors):

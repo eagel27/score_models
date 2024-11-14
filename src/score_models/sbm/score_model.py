@@ -62,7 +62,7 @@ class ScoreModel(Base):
         *args,
         steps: int,
         t=0.0,
-        solver: Literal["euler_ode", "rk2_ode", "rk4_ode"] = "euler_ode",
+        solver: Literal["Euler", "Heun", "RK4"] = "Euler",
         **kwargs
     ) -> Tensor:
         """
@@ -71,6 +71,7 @@ class ScoreModel(Base):
         developed by Chen et al. 2018 (arxiv.org/abs/1806.07366).
         See Song et al. 2020 (arxiv.org/abs/2011.13456) for usage with SDE formalism of SBM.
         """
+        solver = solver + "ODESolver" if "ODESolver" not in solver else solver
         B, *D = x.shape
         solver = ODESolver(self, solver=solver, **kwargs)
         # Solve the probability flow ODE up in temperature to time t=1.
@@ -88,8 +89,8 @@ class ScoreModel(Base):
         shape: tuple,  # TODO grab dimensions from model hyperparams if available
         steps: int,
         solver: Literal[
-            "em_sde", "rk2_sde", "rk4_sde", "euler_ode", "rk2_ode", "rk4_ode"
-        ] = "em_sde",
+            "EMSDESolver", "HeunSDESolver", "RK4SDESolver", "EulerODESolver", "HeunODESolver", "RK4ODESolver"
+        ] = "EMSDESolver",
         progress_bar: bool = True,
         denoise_last_step: bool = True,
         **kwargs
@@ -123,8 +124,8 @@ class ScoreModel(Base):
         *args,
         steps: int,
         solver: Literal[
-            "em_sde", "rk2_sde", "rk4_sde", "euler_ode", "rk2_ode", "rk4_ode"
-        ] = "em_sde",
+            "EMSDESolver", "HeunSDESolver", "RK4SDESolver", "EulerODESolver", "HeunODESolver", "RK4ODESolver"
+        ] = "EMSDESolver",
         progress_bar: bool = True,
         denoise_last_step: bool = True,
         **kwargs

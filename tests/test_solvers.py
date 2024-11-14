@@ -5,8 +5,8 @@ from score_models import (
     MVGEnergyModel,
     Solver,
     ODESolver,
-    EM_SDE,
-    RK2_ODE,
+    EMSDESolver,
+    HeunODESolver,
     MVGScoreModel,
 )
 import pytest
@@ -15,13 +15,13 @@ import pytest
 def test_solver_constructor():
     with pytest.raises(TypeError):  # abstract class cant be created
         Solver(None)
-    assert isinstance(Solver(None, solver="EM_SDE"), EM_SDE), "EM_SDE not created"
-    assert isinstance(ODESolver(None, solver="RK2_ODE"), RK2_ODE), "RK2_ODE not created"
-    assert isinstance(EM_SDE(None), Solver), "EM_SDE not created"
+    assert isinstance(Solver(None, solver="EMSDESolver"), EMSDESolver), "EMSDESolver not created"
+    assert isinstance(Solver(None, solver="HeunODESolver"), HeunODESolver), "HeunODESolver not created"
+    assert isinstance(EMSDESolver(None), Solver), "EMSDESolver not created"
     with pytest.raises(ValueError):  # unknown solver
         Solver(None, solver="random_solver")
     with pytest.raises(ValueError):  # unknown ode solver
-        ODESolver(None, solver="EM_SDE")
+        ODESolver(None, solver="EMSDESolver")
 
 
 @pytest.mark.parametrize(
@@ -32,7 +32,7 @@ def test_solver_constructor():
     ),
 )
 @pytest.mark.parametrize(
-    "solver", ["em_sde", "rk2_sde", "rk4_sde", "euler_ode", "rk2_ode", "rk4_ode"]
+    "solver", ["EMSDESolver", "HeunSDESolver", "RK4SDESolver", "EulerODESolver", "HeunODESolver", "RK4ODESolver"]
 )
 def test_solver_sample(solver, mean, cov):
     sde = VESDE(sigma_min=1e-2, sigma_max=10)
@@ -63,7 +63,7 @@ def test_solver_sample(solver, mean, cov):
     ),
 )
 @pytest.mark.parametrize(
-    "solver", ["em_sde", "rk2_sde", "rk4_sde", "euler_ode", "rk2_ode", "rk4_ode"]
+    "solver", ["EMSDESolver", "HeunSDESolver", "RK4SDESolver", "EulerODESolver", "HeunODESolver", "RK4ODESolver"]
 )
 def test_solver_forward(solver, mean, cov):
     sde = VESDE(sigma_min=1e-2, sigma_max=10)
@@ -77,8 +77,8 @@ def test_solver_forward(solver, mean, cov):
     slvr = Solver(model, solver=solver)
 
     x0 = torch.tensor(np.random.multivariate_normal(mean, cov, 100), dtype=torch.float32)
-    xT = slvr(x0, steps=50, forward=True, return_dlogp="ode" in solver, progress_bar=False)
-    if "ode" in solver:  # check delta_logp calculation for ODE solvers
+    xT = slvr(x0, steps=50, forward=True, return_dlogp="ODE" in solver, progress_bar=False)
+    if "ODE" in solver:  # check delta_logp calculation for ODE solvers
         xT, dlogp = xT
         assert torch.all(torch.isfinite(dlogp))
     assert torch.all(torch.isfinite(xT))

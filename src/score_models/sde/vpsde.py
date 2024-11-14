@@ -1,15 +1,18 @@
 from typing import Literal
 
-import torch
 from torch import Tensor
 from torch.distributions import Independent, Normal
 from torch.func import vmap, grad
-import numpy as np
-
 from .sde import SDE
 from ..utils import DEVICE
+import torch
+import numpy as np
+
 
 PI_OVER_2 = np.pi / 2
+
+
+__all__ = ["VPSDE"]
 
 
 class VPSDE(SDE):
@@ -40,12 +43,12 @@ class VPSDE(SDE):
         )
 
 
-    def beta_primitive(self, t: Tensor, beta_max, beta_min) -> Tensor:
+    def beta_primitive(self, t: Tensor) -> Tensor:
         """
         See equation (33) in Song et al 2020. (https://arxiv.org/abs/2011.13456)
         """
         t = t / self.T
-        return 0.5 * (self.beta_max - self.beta_min) * t**2 + beta_min * t
+        return 0.5 * (self.beta_max - self.beta_min) * t**2 + self.beta_min * t
 
     def beta(self, t: Tensor):
         return vmap(grad(self.beta_primitive))(t)
@@ -70,10 +73,31 @@ class VPSDE(SDE):
         beta = self.beta(t).view(-1, *[1] * len(D))
         return -0.5 * beta * x
 
-    def inv_beta_primitive(self, beta: Tensor, beta_max, beta_min) -> Tensor:
-        beta_diff = beta_max - beta_min
+    def inv_beta_primitive(self, beta: Tensor) -> Tensor:
+        beta_diff = self.beta_max - self.beta_min
         return ((self.beta_min**2 + 2 * beta_diff * beta)**(1/2) - self.beta_min) / beta_diff
 
     def t_sigma(self, sigma: Tensor) -> Tensor:
         beta = -2 * torch.log(torch.sqrt(1 - sigma**2))
         return self._inv_beta_primitive(beta, self.beta_max, self.beta_min) * self.T
+    
+    def c_skip(self, t: Tensor) -> Tensor:
+        """
+        Formula (181) in appendix C.1.2 of Karras et al. 2022 (https://arxiv.org/pdf/2206.00364)
+        """
+        return torch.ones_like(t)
+    
+    def c_out(self, t: Tensor) -> Tensor:
+        """
+        Formula (181) in appendix C.1.2 of Karras et al. 2022 (https://arxiv.org/pdf/2206.00364),
+        modified accordingly our own definition of sigma and mu
+        """
+        return self.sigma(t) * self.mu(t)
+    
+    def c_in(self, t: Tensor) -> Tensor:
+        """
+        Formula (181) in appendix C.1.2 of Karras et al. 2022 (https://arxiv.org/pdf/2206.00364),
+        modified accordingly our own definition of sigma and mu
+        """
+        s = self.sigma(t) * self.mu(t)
+        return 1 / (s**2 + 1)**(1/2)

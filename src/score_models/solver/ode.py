@@ -1,10 +1,12 @@
 from typing import Callable, Literal, Optional
 
-import torch
 from torch import Tensor
 from torch.func import vjp, vmap
 from tqdm import tqdm
 from .solver import Solver
+import torch
+
+__all__ = ["ODESolver", "EulerODESolver", "HeunODESolver", "RK4ODESolver"]
 
 
 class ODESolver(Solver):
@@ -144,7 +146,7 @@ class ODESolver(Solver):
         return divergence
 
 
-class Euler_ODE(ODESolver):
+class EulerODESolver(ODESolver):
     """
     Euler method for solving an ODE
     """
@@ -153,11 +155,10 @@ class Euler_ODE(ODESolver):
         return dx(t, x, *args, dt=dt, **kwargs), dp(t, x, *args, dt=dt, **kwargs)
 
 
-class RK2_ODE(ODESolver):
+class HeunODESolver(ODESolver):
     """
-    Runge Kutta 2nd order ODE solver
+    Runge Kutta 2nd order ODE solver, also know as Heun method
     """
-
     def step(self, t, x, *args, dt, dx, dp, **kwargs):
         k1 = dx(t, x, *args, dt=dt, **kwargs)
         l1 = dp(t, x, *args, dt=dt, **kwargs)
@@ -166,11 +167,10 @@ class RK2_ODE(ODESolver):
         return (k1 + k2) / 2, (l1 + l2) / 2
 
 
-class RK4_ODE(ODESolver):
+class RK4ODESolver(ODESolver):
     """
     Runge Kutta 4th order ODE solver
     """
-
     def step(self, t, x, *args, dt, dx, dp, **kwargs):
         k1 = dx(t, x, *args, dt=dt, **kwargs)
         l1 = dp(t, x, *args, dt=dt, **kwargs)
@@ -181,3 +181,4 @@ class RK4_ODE(ODESolver):
         k4 = dx(t + dt.squeeze(), x + k3, *args, dt=dt, **kwargs)
         l4 = dp(t + dt.squeeze(), x + k3, *args, dt=dt, **kwargs)
         return (k1 + 2 * k2 + 2 * k3 + k4) / 6, (l1 + 2 * l2 + 2 * l3 + l4) / 6
+

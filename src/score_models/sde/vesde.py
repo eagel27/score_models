@@ -1,9 +1,12 @@
-import torch
-from .sde import SDE
 from torch import Tensor
 from torch.distributions import Normal, Independent
 from score_models.utils import DEVICE
+from .sde import SDE
+import torch
 import numpy as np
+
+
+__all__ = ["VESDE"]
 
 
 class VESDE(SDE):
@@ -48,3 +51,12 @@ class VESDE(SDE):
         return torch.log(torch.as_tensor(sigma / self.sigma_min, device=DEVICE)) / torch.log(
             torch.as_tensor(self.sigma_max / self.sigma_min, device=DEVICE)
         )
+    
+    def c_skip(self, t: Tensor) -> Tensor:
+        return torch.ones_like(t)
+
+    def c_out(self, t: Tensor) -> Tensor:
+        return self.sigma(t)
+    
+    def c_in(self, t: Tensor) -> Tensor:
+        return torch.ones_like(t)

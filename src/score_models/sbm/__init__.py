@@ -10,6 +10,7 @@ from .conv_likelihood import *
 from .joint import *
 from .sample import *
 from .tweedie import *
+from .edm_score_model import *
 
 # from .lora_posterior import *
 # from .kernel_slic import *

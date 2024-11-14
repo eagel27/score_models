@@ -1,15 +1,17 @@
 from typing import Literal
 
-import torch
 from torch import Tensor
 from torch.distributions import Independent, Normal
 from torch.func import vmap, grad
-import numpy as np
-
 from .sde import SDE
 from ..utils import DEVICE
+import torch
+import numpy as np
+
 
 PI_OVER_2 = np.pi / 2
+
+__all__ = ["CosineVPSDE"]
 
 
 class CosineVPSDE(SDE):
@@ -36,7 +38,7 @@ class CosineVPSDE(SDE):
         self.beta_max = beta_max
         self.hyperparameters.update({"beta_max": beta_max})
 
-    def beta_primitive(self, t: Tensor, beta_max, *args) -> Tensor:
+    def beta_primitive(self, t: Tensor, *args) -> Tensor:
         """
         See equation (17) in Nichol & Dhariwal 2021. (https://arxiv.org/abs/2102.09672).
         The primitive of the beta function is the log of \bar{alpha} in their notation.
@@ -75,7 +77,7 @@ class CosineVPSDE(SDE):
         beta = self.beta(t).view(-1, *[1] * len(D))
         return -0.5 * beta * x
 
-    def inv_beta_primitive(self, beta: Tensor, beta_max, *args) -> Tensor:
+    def inv_beta_primitive(self, beta: Tensor, *args) -> Tensor:
         """
         The inverse of the beta primitive function.
         """

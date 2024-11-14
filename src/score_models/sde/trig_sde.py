@@ -11,6 +11,8 @@ from ..utils import DEVICE
 
 PI_OVER_2 = np.pi / 2
 
+__all__ = ["TrigSDE"]
+
 
 class TrigSDE(SDE):
     def __init__(

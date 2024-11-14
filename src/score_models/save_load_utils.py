@@ -283,7 +283,7 @@ def load_architecture(
     return net, hyperparameters
 
 
-def load_sde(sde: Optional[Literal["ve", "vp", "tsve"]] = None, **kwargs) -> Tuple["SDE", dict]:
+def load_sde(sde: Optional[Literal["ve", "vp", "cosvp", "tsve"]] = None, **kwargs) -> Tuple["SDE", dict]:
     if sde is None:
         if "sde" not in kwargs.keys():
             # Some sane defaults for quick use of VE or VP
@@ -331,9 +331,16 @@ def load_sde(sde: Optional[Literal["ve", "vp", "tsve"]] = None, **kwargs) -> Tup
                 "beta_max": kwargs.get("beta_max", VPSDE.__init__.__defaults__[1]),
                 "T": kwargs.get("T", VPSDE.__init__.__defaults__[2]),
                 "epsilon": kwargs.get("epsilon", VPSDE.__init__.__defaults__[3]),
-                "schedule": kwargs.get("schedule", VPSDE.__init__.__defaults__[4])
                 }
         sde = VPSDE(**sde_hyperparameters)
+    
+    elif sde.lower() == "cosvp":
+        from score_models.sde import CosineVPSDE
+        sde_hyperparameters = {
+                "beta_max": kwargs.get("beta_max", CosineVPSDE.__init__.__defaults__[0]),
+                "T": kwargs.get("T", CosineVPSDE.__init__.__defaults__[1]),
+                "epsilon": kwargs.get("epsilon", CosineVPSDE.__init__.__defaults__[2]),
+                }
     
     elif sde.lower() == "tsve":
         if "sigma_min" not in kwargs.keys() or "sigma_max" not in kwargs.keys():

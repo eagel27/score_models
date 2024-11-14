@@ -82,6 +82,7 @@ def plot_scatter(
         ticks=None, 
         colorbar=False, 
         cmap=cmap, 
+        extent=None,
         **kwargs):
     """
     Scatter plot colored by 2d histogram
@@ -110,6 +111,9 @@ def plot_scatter(
         cax = plt.axes([box.x0*1.01 + box.width * 1.05, box.y0, 0.02, box.height])
         fig.colorbar(sm, cax=cax, ticks=ticks)
         cax.set_ylabel(r'$p(\mathbf{x})$')
+    if extent is not None:
+        ax.set_xlim(extent[:2])
+        ax.set_ylim(extent[2:])
     return ax
 
 

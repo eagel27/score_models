@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
-import torch
-from torch import Tensor
-
 from ..utils import DEVICE
+from torch import Tensor
+import torch
+
 
 __all__ = ["Solver"]
 
