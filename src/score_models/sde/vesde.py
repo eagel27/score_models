@@ -60,3 +60,10 @@ class VESDE(SDE):
     
     def c_in(self, t: Tensor) -> Tensor:
         return torch.ones_like(t)
+
+    def edm_scale(self, t: Tensor) -> Tensor:
+        """
+        Reformulation of mu(t) in the EDM framework of Karras et al. 2022 (https://arxiv.org/pdf/2206.00364)
+        """
+        return torch.ones_like(t)
+

@@ -39,13 +39,14 @@ class EDMScoreModel(ScoreModel):
     
     def score(self, t, x, *args, **kwargs) -> Tensor:
         """
-        Score function is defined using Tweedie formula and the preconditioned denoiser
+        Score function is defined using Tweedie formula and the preconditioned denoiser. 
+        For VP, one can look at equation 186. 
         """
         B, *D = x.shape
         x0 = self.preconditioned_denoiser(t, x, *args, **kwargs) # Estimate of E[x0 | xt]
         sigma = self.sde.sigma(t).view(B, *[1]*len(D))
-        mu = self.sde.mu(t).view(B, *[1]*len(D))
-        return (mu * x0 - x) / sigma**2
+        s = self.sde.edm_scale(t).view(B, *[1]*len(D)) # Scale from the EDM formulation
+        return (x0 - x) / sigma**2 / s
 
     def preconditioned_denoiser(self, t, x: Tensor, *args, **kwargs) -> Tensor:
         B, *D = x.shape

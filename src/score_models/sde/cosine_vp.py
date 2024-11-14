@@ -19,7 +19,7 @@ class CosineVPSDE(SDE):
         self,
         beta_max: float = 100,
         T: float = 1.0,
-        epsilon: float = 0,
+        epsilon: float = 1e-3, # Very important for EDM formulation, otherwise can be set to 0
         **kwargs,
     ):
         """
@@ -90,3 +90,32 @@ class CosineVPSDE(SDE):
     def t_sigma(self, sigma: Tensor) -> Tensor:
         beta = -2 * torch.log(torch.sqrt(1 - sigma**2))
         return self._inv_beta_primitive(beta, self.beta_max, self.beta_min) * self.T
+
+    def c_skip(self, t: Tensor) -> Tensor:
+        """
+        Formula (181) in appendix C.1.2 of Karras et al. 2022 (https://arxiv.org/pdf/2206.00364)
+        """
+        return torch.ones_like(t)
+    
+    def c_out(self, t: Tensor) -> Tensor:
+        """
+        Formula (181) in appendix C.1.2 of Karras et al. 2022 (https://arxiv.org/pdf/2206.00364),
+        modified accordingly our own definition of sigma and mu
+        """
+        return self.sigma(t)
+    
+    def c_in(self, t: Tensor) -> Tensor:
+        """
+        Formula (181) in appendix C.1.2 of Karras et al. 2022 (https://arxiv.org/pdf/2206.00364),
+        modified accordingly our own definition of sigma and mu
+        """
+        sigma = self.sigma(t)
+        return 1 / (sigma**2 + 1)**(1/2)
+    
+    def edm_scale(self, t: Tensor) -> Tensor:
+        """
+        Formula (170), reformulation of mu(t) in the EDM framework of Karras et al. 2022 (https://arxiv.org/pdf/2206.00364)
+        """
+        sigma = self.sigma(t)
+        return 1 / (sigma**2 + 1)**(1/2)
+

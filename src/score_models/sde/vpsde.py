@@ -91,12 +91,19 @@ class VPSDE(SDE):
         Formula (181) in appendix C.1.2 of Karras et al. 2022 (https://arxiv.org/pdf/2206.00364),
         modified accordingly our own definition of sigma and mu
         """
-        return self.sigma(t) * self.mu(t)
+        return self.sigma(t)
     
     def c_in(self, t: Tensor) -> Tensor:
         """
         Formula (181) in appendix C.1.2 of Karras et al. 2022 (https://arxiv.org/pdf/2206.00364),
         modified accordingly our own definition of sigma and mu
         """
-        s = self.sigma(t) * self.mu(t)
-        return 1 / (s**2 + 1)**(1/2)
+        sigma = self.sigma(t)
+        return 1 / (sigma**2 + 1)**(1/2)
+    
+    def edm_scale(self, t: Tensor) -> Tensor:
+        """
+        Formula (170), reformulation of mu(t) in the EDM framework of Karras et al. 2022 (https://arxiv.org/pdf/2206.00364)
+        """
+        sigma = self.sigma(t)
+        return 1 / (sigma**2 + 1)**(1/2)
