@@ -42,5 +42,5 @@ class TrigSDE(SDE):
     def inv_beta_primitive(self, beta: Tensor, beta_max, *args) -> Tensor:
         ...
 
-    def t_sigma(self, sigma: Tensor) -> Tensor:
+    def sigma_inverse(self, sigma: Tensor) -> Tensor:
         ...

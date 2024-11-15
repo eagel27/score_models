@@ -32,7 +32,7 @@ def dsm(model: "ScoreModel", x: Tensor, *args: list[Tensor], **kwargs):
     xt = mu * x + sigma * z                                                        # xt ~ p(xt | x0)
     
     # Compute the loss
-    epsilon_theta = model.reparametrized_score(t, xt, *args)                       # epsilon_theta(t, x) = sigma(t) * s(t, x)
+    epsilon_theta = model.reparametrized_score(t, xt, *args)                       # epsilon_theta(t, x) = sigma(t) * score(t, x)
     return ((epsilon_theta + z)**2).sum() / (2 * B)
 
 def edm_dsm(model: "ScoreModel", x: Tensor, *args: list[Tensor], **kwargs):
@@ -49,6 +49,7 @@ def edm_dsm(model: "ScoreModel", x: Tensor, *args: list[Tensor], **kwargs):
     sde = model.sde
     
     t = torch.rand(B).to(model.device) * (sde.T - sde.epsilon) + sde.epsilon       # t ~ U(epsilon, T)
+    # t = model.sample_noise_level(B)
     z = torch.randn_like(x)                                                        # z ~ N(0, 1)
     
     # Sample from the marginal at time t using the Gaussian perturbation kernel
@@ -56,11 +57,11 @@ def edm_dsm(model: "ScoreModel", x: Tensor, *args: list[Tensor], **kwargs):
     sigma = sde.sigma(t).view(-1, *[1]*len(D))
     xt = mu * x + sigma * z                                                        # xt ~ p(xt | x0)
     
-    # Denoising loss
+    # EDM Denoising loss, with weight factor taken into account
     F_theta = model.reparametrized_score(t, xt, *args)
     c_out = model.sde.c_out(t).view(B, *[1]*len(D))
     c_skip = model.sde.c_skip(t).view(B, *[1]*len(D))
-    effective_score = 1/c_out * (x - c_skip * xt)
+    effective_score = (x - c_skip * xt) / c_out
     return ((F_theta - effective_score)**2).sum() / (2 * B)
 
 def denoising_score_matching(

@@ -45,7 +45,7 @@ class NCSNpp(nn.Module):
         progressive: Literal["none", "output_skip", "residual"] = "output_skip",
         progressive_input: Literal["none", "input_skip", "residual"] = "input_skip",
         init_scale: float = 1e-2,
-        fourier_scale: float = 16.0,
+        fourier_scale: float = 0.02, # Leads to much smoother score function (Lu & Song, https://arxiv.org/abs/2410.11081)
         resblock_type: Literal["biggan", "ddpm"] = "biggan",
         combine_method: Literal["cat", "sum"] = "cat",
         attention: bool = True,

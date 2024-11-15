@@ -67,6 +67,7 @@ class Solver(ABC):
         kill_on_nan=False,
         **kwargs,
     ):
+        print("Solver.__call__")
         return self.solve(
             x,
             *args,
@@ -131,11 +132,3 @@ class Solver(ABC):
         t_max = kwargs.get("t_max", self.sde.t_max)
         return torch.as_tensor(h * (t_max - t_min) / steps, device=device)
 
-    def tweedie(self, t: Tensor, x: Tensor, *args, **kwargs) -> Tensor:
-        """
-        Compute the Tweedie formula for the expectation E[x0 | xt]
-        """
-        B, *D = x.shape
-        mu = self.sde.mu(t).view(-1, *[1] * len(D))
-        sigma = self.sde.sigma(t).view(-1, *[1] * len(D))
-        return (x + sigma**2 * self.sbm.score(t, x, *args, **kwargs)) / mu

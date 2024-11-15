@@ -38,7 +38,7 @@ class Encoder(nn.Module):
         hidden_layers: int = 1,
         hidden_size: int = 256,
         factor: int = 2,
-        fourier_scale: float = 16.0,
+        fourier_scale: float = 0.02,
         conditions: Optional[
             tuple[Literal["time_discrete", "time_continuous", "time_vector", "input_tensor"]]
         ] = None,

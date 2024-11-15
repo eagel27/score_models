@@ -87,7 +87,7 @@ class CosineVPSDE(SDE):
             beta / self.beta_max,
         )
 
-    def t_sigma(self, sigma: Tensor) -> Tensor:
+    def sigma_inverse(self, sigma: Tensor) -> Tensor:
         beta = -2 * torch.log(torch.sqrt(1 - sigma**2))
         return self._inv_beta_primitive(beta, self.beta_max, self.beta_min) * self.T
 
@@ -111,11 +111,4 @@ class CosineVPSDE(SDE):
         """
         sigma = self.sigma(t)
         return 1 / (sigma**2 + 1)**(1/2)
-    
-    def edm_scale(self, t: Tensor) -> Tensor:
-        """
-        Formula (170), reformulation of mu(t) in the EDM framework of Karras et al. 2022 (https://arxiv.org/pdf/2206.00364)
-        """
-        sigma = self.sigma(t)
-        return 1 / (sigma**2 + 1)**(1/2)
-
+  

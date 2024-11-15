@@ -47,7 +47,6 @@ def test_solver_sample(solver, mean, cov):
         shape=(100, mean.shape[-1]),
         steps=50,
         solver=solver,
-        denoise_last_step=True,
         kill_on_nan=True,
     )
     assert torch.all(torch.isfinite(samples))

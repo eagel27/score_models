@@ -2,8 +2,8 @@ import torch
 from torch import Tensor
 
 from ..sde import SDE
-from .score_model import ScoreModel
 from ..architectures import NullNet
+from .score_model import ScoreModel
 
 
 class SampleScoreModel(ScoreModel):

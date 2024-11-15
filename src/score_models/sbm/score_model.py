@@ -5,7 +5,6 @@ from torch.nn import Module
 import torch
 
 from .base import Base
-# from .edm_score_model import EDMScoreModel
 from ..sde import SDE
 from ..losses import dsm
 from ..solver import Solver, ODESolver
@@ -18,14 +17,12 @@ __all__ = ["ScoreModel"]
 
 
 class ScoreModel(Base):
-    # Idea, though need to make sure we can make a transition to EDM as default that do not break old models
-    # def __new__(cls, *args, formulation: Literal["original", "edm"] = "original", **kwargs):
-        # if formulation.lower() == "edm":
-            # # Instantion with the EDM formalism
-            # return EDMScoreModel(*args, **kwargs)
-        # else:
-            # # Normal instantiation
-            # return super().__new__(cls)
+    def __new__(cls, *args, formulation: Literal["original", "edm"] = "original", **kwargs):
+        if formulation.lower() == "edm":
+            from score_models import EDMScoreModel
+            return super().__new__(EDMScoreModel)
+        else:
+            return super().__new__(cls)
 
     def __init__(
         self,
@@ -71,7 +68,7 @@ class ScoreModel(Base):
         x,
         *args,
         steps: int,
-        t=0.0,
+        t: float = 0.0,
         solver: Literal["Euler", "Heun", "RK4"] = "Euler",
         **kwargs
     ) -> Tensor:
@@ -81,6 +78,8 @@ class ScoreModel(Base):
         developed by Chen et al. 2018 (arxiv.org/abs/1806.07366).
         See Song et al. 2020 (arxiv.org/abs/2011.13456) for usage with SDE formalism of SBM.
         """
+        if t == 0.0:
+            t = self.sde.t_min
         solver = solver + "ODESolver" if "ODESolver" not in solver else solver
         B, *D = x.shape
         solver = ODESolver(self, solver=solver, **kwargs)
@@ -121,9 +120,11 @@ class ScoreModel(Base):
             steps=steps,
             forward=False,
             progress_bar=progress_bar,
-            denoise_last_step=denoise_last_step,
             **kwargs
         )
+        if denoise_last_step:
+            t = self.sde.t_min * torch.ones(B, device=self.device)
+            x0 = self.tweedie(t, x0, *args, **kwargs)
         return x0
 
     @torch.no_grad()
@@ -137,7 +138,6 @@ class ScoreModel(Base):
             "EMSDESolver", "HeunSDESolver", "RK4SDESolver", "EulerODESolver", "HeunODESolver", "RK4ODESolver"
         ] = "EMSDESolver",
         progress_bar: bool = True,
-        denoise_last_step: bool = True,
         **kwargs
     ) -> Tensor:
         """
@@ -153,9 +153,11 @@ class ScoreModel(Base):
             steps=steps,
             forward=False,
             progress_bar=progress_bar,
-            denoise_last_step=denoise_last_step,
             **kwargs
         )
+        # Denoise last step with Tweedie
+        t = self.sde.t_min * torch.ones(x0.shape[0], device=self.device)
+        x0 = self.tweedie(t, x0, *args, **kwargs)
         return x0
 
     def tweedie(self, t: Tensor, x: Tensor, *args, **kwargs) -> Tensor:

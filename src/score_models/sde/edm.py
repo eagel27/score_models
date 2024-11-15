@@ -48,11 +48,12 @@ class EDMSDE(SDE):
     def drift(self, t: Tensor, x: Tensor) -> Tensor:
         return torch.zeros_like(x)
 
-    def inv_beta_primitive(self, beta: Tensor, beta_max, *args) -> Tensor:
-        ...
+    def sigma_inverse(self, sigma: Tensor) -> Tensor:
+        sigma_diff = self.sigma_max**(1/rho) - self.sigma_min**(1/rho)
+        return (sigma**(1/rho) - self.sigma_min**(1/rho)) * self.T / sigma_diff
 
-    def t_sigma(self, sigma: Tensor) -> Tensor:
-        ...
+    def prior(self, shape, mean=None, device=DEVICE):
+        if mean is None:
+            mean = torch.zeros(shape).to(device)
+        return Independent(Normal(loc=mean, scale=self.sigma_max, validate_args=False), len(shape))
 
-    def prior(self, shape, device=DEVICE):
-        ...

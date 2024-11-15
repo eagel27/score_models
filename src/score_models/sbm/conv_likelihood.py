@@ -1,7 +1,7 @@
 from typing import Callable, Union, Tuple, Optional
-import torch
 from torch import Tensor
 from torch import vmap
+import torch
 import numpy as np
 
 from ..sde import SDE

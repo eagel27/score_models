@@ -21,7 +21,6 @@ class ODESolver(Solver):
         progress_bar: bool = True,
         trace: bool = False,
         kill_on_nan: bool = False,
-        denoise_last_step: bool = False,
         time_steps: Optional[Tensor] = None,
         dlogp: Optional[Callable] = None,
         return_dlogp: bool = False,
@@ -52,7 +51,6 @@ class ODESolver(Solver):
             progress_bar: Whether to display a progress bar.
             trace: Whether to return the full path or just the last point.
             kill_on_nan: Whether to raise an error if NaNs are encountered.
-            denoise_last_step: Whether to project to the boundary at the last step.
             dlogp: Optional function to compute the divergence of the drift function.
             return_dlogp: Whether to return the log probability change.
             time_steps: Optional time steps to use for integration. Should be a 1D tensor containing the bin edges of the
@@ -92,11 +90,6 @@ class ODESolver(Solver):
                 path.append(x)
             if hook is not None:
                 hook(t, x, self.sde, self.sbm.score, self)
-
-        if denoise_last_step and not forward:
-            x = self.tweedie(t, x, *args, **kwargs)
-            if trace:
-                path[-1] = x
         if trace:
             if return_dlogp:
                 return torch.stack(path), logp

@@ -47,10 +47,9 @@ class VESDE(SDE):
             mean = torch.zeros(shape).to(device)
         return Independent(Normal(loc=mean, scale=self.sigma_max, validate_args=False), len(shape))
 
-    def t_sigma(self, sigma: Tensor) -> Tensor:
-        return torch.log(torch.as_tensor(sigma / self.sigma_min, device=DEVICE)) / torch.log(
-            torch.as_tensor(self.sigma_max / self.sigma_min, device=DEVICE)
-        )
+    def sigma_inverse(self, sigma: Tensor) -> Tensor:
+        sigma_d = torch.as_tensor(self.sigma_max / self.sigma_min, device=DEVICE)
+        return torch.log(sigma/self.sigma_min) / torch.log(sigma_d) * self.T
     
     def c_skip(self, t: Tensor) -> Tensor:
         return torch.ones_like(t)
@@ -59,11 +58,5 @@ class VESDE(SDE):
         return self.sigma(t)
     
     def c_in(self, t: Tensor) -> Tensor:
-        return torch.ones_like(t)
-
-    def edm_scale(self, t: Tensor) -> Tensor:
-        """
-        Reformulation of mu(t) in the EDM framework of Karras et al. 2022 (https://arxiv.org/pdf/2206.00364)
-        """
         return torch.ones_like(t)
 

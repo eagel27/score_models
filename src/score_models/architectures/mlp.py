@@ -21,7 +21,7 @@ class MLP(nn.Module):
         channels: int,
         width: int = 100,
         layers: int = 4,
-        fourier_scale: int = 16,
+        fourier_scale: int = 0.02, # Leads to smoother score functions (Lu & Song, https://arxiv.org/abs/2410.11081)
         activation: int = "silu",
         attention: bool = False,
         nn_is_energy: bool = False,

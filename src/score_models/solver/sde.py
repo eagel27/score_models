@@ -21,7 +21,6 @@ class SDESolver(Solver):
         progress_bar: bool = True,
         trace: bool = False,
         kill_on_nan: bool = False,
-        denoise_last_step: bool = False,
         time_steps: Optional[Tensor] = None,
         corrector_steps: int = 0,
         corrector_snr: float = 0.1,
@@ -52,7 +51,6 @@ class SDESolver(Solver):
             progress_bar: Whether to display a progress bar.
             trace: Whether to return the full path or just the last point.
             kill_on_nan: Whether to raise an error if NaNs are encountered.
-            denoise_last_step: Whether to project to the boundary at the last step.
             time_steps: Optional time steps to use for integration. Should be a 1D tensor containing the bin edges of the
                 time steps. For example, if one wanted 50 steps from 0 to 1, the time steps would be ``torch.linspace(0, 1, 51)``.
             corrector_steps: Number of corrector steps to add after each SDE step (0 for no corrector steps).
@@ -63,44 +61,27 @@ class SDESolver(Solver):
 
         # Step
         T, dT = self.time_steps(steps, B, D, time_steps=time_steps, forward=forward, **kwargs)
-
-        # Trace if requested
         if trace:
             path = [x]
 
-        # Progress bar
         pbar = tqdm(tuple(zip(T, dT))) if progress_bar else zip(T, dT)
         for t, dt in pbar:
+            x = x + self.step(t, x, args, dt, forward, **kwargs)
+            for _ in range(corrector_steps):
+                x = self.corrector_step(t, x, args, corrector_snr, **kwargs)
+            
+            # Logs
             if progress_bar:
                 pbar.set_description(
                     f"t={t[0].item():.1g} | sigma={self.sde.sigma(t)[0].item():.1g} | "
                     f"x={x.mean().item():.1g}\u00B1{x.std().item():.1g}"
                 )
-
-            # Check for NaNs
             if kill_on_nan and torch.any(torch.isnan(x)):
                 raise ValueError("NaN encountered in SDE solver")
-
-            # Update x
-            x = x + self.step(t, x, args, dt, forward, **kwargs)
-
-            # Add requested corrector steps
-            for _ in range(corrector_steps):
-                x = self.corrector_step(t, x, args, corrector_snr, **kwargs)
-
             if trace:
                 path.append(x)
-
-            # Call hook
             if hook is not None:
                 hook(t, x, self.sde, self.sbm.score, self)
-
-        # Project to boundary if denoising
-        if denoise_last_step and not forward:
-            x = self.tweedie(t, x, *args, **kwargs)
-            if trace:
-                path[-1] = x
-
         if trace:
             return torch.stack(path)
         return x
