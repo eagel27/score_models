@@ -72,13 +72,13 @@ class VPSDE(SDE):
         beta = self.beta(t).view(-1, *[1] * len(D))
         return -0.5 * beta * x
 
-    def inv_beta_primitive(self, beta: Tensor) -> Tensor:
+    def beta_primitive_inverse(self, beta: Tensor) -> Tensor:
         beta_diff = self.beta_max - self.beta_min
         return ((self.beta_min**2 + 2 * beta_diff * beta)**(1/2) - self.beta_min) / beta_diff
 
     def sigma_inverse(self, sigma: Tensor) -> Tensor:
         beta = - 2 * torch.log(torch.sqrt(1 - sigma**2))
-        return self._inv_beta_primitive(beta, self.beta_max, self.beta_min) * self.T
+        return self.beta_primitive_inverse(beta) * self.T
     
     def c_skip(self, t: Tensor) -> Tensor:
         """

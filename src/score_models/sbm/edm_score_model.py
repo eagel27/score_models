@@ -26,20 +26,27 @@ class EDMScoreModel(ScoreModel):
         # hessian_diagonal_model: Optional["HessianDiagonal"] = None,
         device=DEVICE,
         sample_noise_level_function: Optional[Callable] = None,
-        noise_level_: Literal["uniform", "normal"] = "uniform",
+        noise_level_distribution: Literal["uniform", "normal"] = "uniform",
         log_sigma_mean: float = -1.2,
         log_sigma_std: float = 1.2,
         **hyperparameters
     ):
-        # Hessian Diagonal model is not supported for EDM model
+        # Hessian Diagonal model is not supported for EDM models 
         super().__init__(net, sde, path, checkpoint=checkpoint, device=device, **hyperparameters)
-        # if sample_noise_level_function is None:
-            # # if noise_level_ == "uniform":
-                # # self.sample_noise_level = self._uniform_noise_level_distribution
-            # # elif noise_level_ == "normal":
-                # # self.sample_noise_level = self._normal_noise_level_distribution
-        # else:
-            # self.sample_noise_level = sample_noise_level_function
+        if sample_noise_level_function is None:
+            if noise_level_distribution == "uniform":
+                print("Samplng distribution is Uniform in [epsilon, T]")
+                self.sample_noise_level = self._uniform_noise_level_distribution
+            elif noise_level_distribution == "normal":
+                print(f"Sampling distribution is log-Normal for sigma with mean {log_sigma_mean} and standard deviation {log_sigma_std}")
+                self.log_sigma_mean = log_sigma_mean
+                self.log_sigma_std = log_sigma_std
+                self.sample_noise_level = self._normal_noise_level_distribution
+            else:
+                raise ValueError(f"Sampling distribution {noise_level_distribution} is not recognized. Choose between 'uniform' and 'normal'.")
+        else:
+            print(f"Using custom noise level sampling function {sample_noise_level_function.__name__}") 
+            self.sample_noise_level = sample_noise_level_function
 
     def loss(self, x, *args, step: int) -> Tensor:
         return edm_dsm(self, x, *args)
@@ -73,11 +80,19 @@ class EDMScoreModel(ScoreModel):
         c_skip = self.sde.c_skip(t).view(B, *[1]*len(D))
         return c_skip * x + c_out * F_theta
     
-    # def _uniform_noise_level_distribution(self, t: Tensor) -> Tensor:
-        # return torch.rand_like(t) * (self.sde.T - self.sde.epsilon) + self.sde.epsilon
+    def _uniform_noise_level_distribution(self, B: int) -> Tensor:
+        return torch.rand(B, device=self.device) * (self.sde.T - self.sde.epsilon) + self.sde.epsilon
     
-    # def _normal_noise_level_distribution(self, t: Tensor) -> Tensor:
-        # return torch.randn_like(t) * self.sde.sigma(t) + t
+    def _normal_noise_level_distribution(self, B: int) -> Tensor:
+        """
+        Sample noise level from a log-Normal distribution, 
+        then compute the corresponding time-index for this noise level.
+        This is the recommended setting for the EDM formulation.
+        """
+        log_sigma = torch.randn(B, device=self.device) * self.log_sigma_std + self.log_sigma_mean
+        sigma = torch.exp(log_sigma)
+        t = self.sde.sigma_inverse(sigma)
+        return t
 
     def tweedie(self, t: Tensor, x: Tensor, *args, **kwargs) -> Tensor:
         return self.preconditioned_denoiser(t, x, *args, **kwargs)

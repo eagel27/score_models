@@ -48,8 +48,7 @@ def edm_dsm(model: "ScoreModel", x: Tensor, *args: list[Tensor], **kwargs):
     B, *D = x.shape
     sde = model.sde
     
-    t = torch.rand(B).to(model.device) * (sde.T - sde.epsilon) + sde.epsilon       # t ~ U(epsilon, T)
-    # t = model.sample_noise_level(B)
+    t = model.sample_noise_level(B)
     z = torch.randn_like(x)                                                        # z ~ N(0, 1)
     
     # Sample from the marginal at time t using the Gaussian perturbation kernel

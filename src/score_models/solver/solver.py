@@ -67,7 +67,6 @@ class Solver(ABC):
         kill_on_nan=False,
         **kwargs,
     ):
-        print("Solver.__call__")
         return self.solve(
             x,
             *args,

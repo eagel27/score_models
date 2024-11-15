@@ -43,7 +43,7 @@ class SampleScoreModel(ScoreModel):
     def score(self, t: Tensor, x: Tensor, *args, **kwargs):
         B, *D = x.shape
         K, *D = self.samples.shape
-        sigma_t = self.sde.sigma(t[0])
+        sigma_t = self.sde.sigma(t[0]) # This is wrong, should be calculated for all t, not assume t[0]
         mu_t = self.sde.mu(t[0])
         W = torch.sum(
             -0.5
