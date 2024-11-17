@@ -50,7 +50,7 @@ class NCSNpp(nn.Module):
         combine_method: Literal["cat", "sum"] = "cat",
         attention: bool = True,
         conditions: Optional[
-            tuple[Literal["time_discrete", "time_continuous", "time_vector", "input_tensor"]]
+            tuple[Literal["time_discrete", "time_continuous", "time_vector", "input_tensor"]] # TODO: make better names
         ] = None,
         condition_embeddings: Optional[tuple[int]] = None,
         condition_channels: Optional[int] = None,

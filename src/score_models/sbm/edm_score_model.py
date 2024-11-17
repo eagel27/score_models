@@ -24,15 +24,18 @@ class EDMScoreModel(ScoreModel):
         path: Optional[str] = None,
         checkpoint: Optional[int] = None,
         # hessian_diagonal_model: Optional["HessianDiagonal"] = None,
-        device=DEVICE,
         sample_noise_level_function: Optional[Callable] = None,
         noise_level_distribution: Literal["uniform", "normal"] = "uniform",
         log_sigma_mean: float = -1.2,
         log_sigma_std: float = 1.2,
+        device=DEVICE,
         **hyperparameters
     ):
-        # Hessian Diagonal model is not supported for EDM models 
+        # Hessian Diagonal model is not supported for EDM models
         super().__init__(net, sde, path, checkpoint=checkpoint, device=device, **hyperparameters)
+        # Make sure to save in hyperparameters the formulation
+        self.hyperparameters["formulation"] = "edm"
+
         if sample_noise_level_function is None:
             if noise_level_distribution == "uniform":
                 print("Samplng distribution is Uniform in [epsilon, T]")

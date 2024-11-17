@@ -8,11 +8,16 @@
 """
 Improved diffusion model architecture proposed in the paper
 Analyzing and Improving the Training Dynamics of Diffusion Models.
+
+Original implementation by: Tero Karras (https://github.com/NVlabs/edm2/blob/main/training/networks_edm2.py)
+Some modifications were made to adapt the code to the API.
 """
-
-
+from typing import List, Optional, Literal
+from torch import Tensor
 import numpy as np
 import torch
+
+__all__ = ["EDMv2Net"]
 
 #----------------------------------------------------------------------------
 # Utility functions.
@@ -108,9 +113,9 @@ class MPFourier(torch.nn.Module):
         self.register_buffer('freqs', 2 * np.pi * torch.randn(num_channels) * bandwidth)
         self.register_buffer('phases', 2 * np.pi * torch.rand(num_channels))
 
-    def forward(self, x):
-        y = x.to(torch.float32)
-        y = y.ger(self.freqs.to(torch.float32))
+    def forward(self, t): 
+        emb = t.to(torch.float32)
+        emb = torch.outer(emb, self.freqs.to(torch.float32))
         y = y + self.phases.to(torch.float32)
         y = y.cos() * np.sqrt(2)
         return y.to(x.dtype)
@@ -142,19 +147,20 @@ class MPConv(torch.nn.Module):
 # U-Net encoder/decoder block with optional self-attention (Figure 21).
 
 class Block(torch.nn.Module):
-    def __init__(self,
-        in_channels,                    # Number of input channels.
-        out_channels,                   # Number of output channels.
-        emb_channels,                   # Number of embedding channels.
-        flavor              = 'enc',    # Flavor: 'enc' or 'dec'.
-        resample_mode       = 'keep',   # Resampling: 'keep', 'up', or 'down'.
-        resample_filter     = [1,1],    # Resampling filter.
-        attention           = False,    # Include self-attention?
-        channels_per_head   = 64,       # Number of channels per attention head.
-        dropout             = 0,        # Dropout probability.
-        res_balance         = 0.3,      # Balance between main branch (0) and residual branch (1).
-        attn_balance        = 0.3,      # Balance between main branch (0) and self-attention (1).
-        clip_act            = 256,      # Clip output activations. None = do not clip.
+    def __init__(
+            self,
+            in_channels: int,                               # Number of input channels.
+            out_channels: int,                              # Number of output channels.
+            emb_channels: int,                              # Number of embedding channels.
+            flavor: Literal["enc", "dec"]                = 'enc',    # Flavor: 'enc' or 'dec'.
+            resample_mode: Literal["keep", "up", "down"] = 'keep',   # Resampling: 'keep', 'up', or 'down'.
+            resample_filter: List[int]                   = [1,1],    # Resampling filter.
+            attention: bool                              = False,    # Include self-attention?
+            channels_per_head: int                       = 64,       # Number of channels per attention head.
+            dropout: float                               = 0,        # Dropout probability.
+            res_balance: float                           = 0.3,      # Balance between main branch (0) and residual branch (1).
+            attn_balance: float                          = 0.3,      # Balance between main branch (0) and self-attention (1).
+            clip_act: Optional[float]                    = None,     # Clip output activations. None = do not clip. (Karras et al. 2023 used clip_act=256)
     ):
         super().__init__()
         self.out_channels = out_channels
@@ -216,19 +222,21 @@ class Block(torch.nn.Module):
 # EDM2 U-Net model (Figure 21).
 
 class UNet(torch.nn.Module):
-    def __init__(self,
-        img_resolution,                     # Image resolution.
-        img_channels,                       # Image channels.
-        label_dim,                          # Class label dimensionality. 0 = unconditional.
-        model_channels      = 192,          # Base multiplier for the number of channels.
-        channel_mult        = [1,2,3,4],    # Per-resolution multipliers for the number of channels.
-        channel_mult_noise  = None,         # Multiplier for noise embedding dimensionality. None = select based on channel_mult.
-        channel_mult_emb    = None,         # Multiplier for final embedding dimensionality. None = select based on channel_mult.
-        num_blocks          = 3,            # Number of residual blocks per resolution.
-        attn_resolutions    = [16,8],       # List of resolutions with self-attention.
-        label_balance       = 0.5,          # Balance between noise embedding (0) and class embedding (1).
-        concat_balance      = 0.5,          # Balance between skip connections (0) and main path (1).
-        **block_kwargs,                     # Arguments for Block.
+    def __init__(
+            self,
+            img_resolution: int,                      # Image resolution.
+            img_channels: int,                        # Image channels.
+            # label_dim,                              # Class label dimensionality. 0 = unconditional.
+            model_channels: int             = 192,    # Base multiplier for the number of channels.
+            channel_mult: List[int]         = [1,2,3,4], # Per-resolution multipliers for the number of channels.
+            channel_mult_noise: Optional[int] = None, # Multiplier for noise embedding dimensionality. None = select based on channel_mult.
+            channel_mult_emb: Optional[int] = None,   # Multiplier for final embedding dimensionality. None = select based on channel_mult.
+            num_blocks: int                 = 3,      # Number of residual blocks per resolution.
+            attn_resolutions: List[int]     = [16,8], # List of resolutions with self-attention.
+            label_balance: float            = 0.5,    # Balance between noise embedding (0) and class embedding (1).
+            concat_balance: float           = 0.5,    # Balance between skip connections (0) and main path (1).
+            fourier_scale: float            = 0.02,   # Leads to much smoother score function (Lu & Song, https://arxiv.org/abs/2410.11081)
+            **block_kwargs,                           # Arguments for Block.
     ):
         super().__init__()
         cblock = [model_channels * x for x in channel_mult]
@@ -241,7 +249,7 @@ class UNet(torch.nn.Module):
         # Embedding.
         self.emb_fourier = MPFourier(cnoise)
         self.emb_noise = MPConv(cnoise, cemb, kernel=[])
-        self.emb_label = MPConv(label_dim, cemb, kernel=[]) if label_dim != 0 else None
+        # self.emb_label = MPConv(label_dim, cemb, kernel=[]) if label_dim != 0 else None
 
         # Encoder.
         self.enc = torch.nn.ModuleDict()
@@ -275,11 +283,11 @@ class UNet(torch.nn.Module):
                 self.dec[f'{res}x{res}_block{idx}'] = Block(cin, cout, cemb, flavor='dec', attention=(res in attn_resolutions), **block_kwargs)
         self.out_conv = MPConv(cout, img_channels, kernel=[3,3])
 
-    def forward(self, x, noise_labels, class_labels):
+    def forward(self, t, x, *args, **kwargs):
         # Embedding.
-        emb = self.emb_noise(self.emb_fourier(noise_labels))
-        if self.emb_label is not None:
-            emb = mp_sum(emb, self.emb_label(class_labels * np.sqrt(class_labels.shape[1])), t=self.label_balance)
+        emb = self.emb_noise(self.emb_fourier(t))
+        # if self.emb_label is not None:
+            # emb = mp_sum(emb, self.emb_label(class_labels * np.sqrt(class_labels.shape[1])), t=self.label_balance)
         emb = mp_silu(emb)
 
         # Encoder.
@@ -300,46 +308,41 @@ class UNet(torch.nn.Module):
 #----------------------------------------------------------------------------
 # Preconditioning and uncertainty estimation.
 
-class Precond(torch.nn.Module):
-    def __init__(self,
-        img_resolution,         # Image resolution.
-        img_channels,           # Image channels.
-        label_dim,              # Class label dimensionality. 0 = unconditional.
-        use_fp16        = True, # Run the model at FP16 precision?
-        sigma_data      = 0.5,  # Expected standard deviation of the training data.
-        logvar_channels = 128,  # Intermediate dimensionality for uncertainty estimation.
-        **unet_kwargs,          # Keyword arguments for UNet.
+class EDMv2Net(torch.nn.Module):
+    """
+    As described in Karras et al. 2023, the EDMv2Net is composed of the U-net 
+    and an uncertainty estimation module to allow for the dynamic reweighting 
+    of the noise levels during training.
+    """
+    def __init__(
+            self,
+            img_resolution: int,         # Image resolution.
+            img_channels: int,           # Image channels.
+            logvar_channels: int = 128,  # Intermediate dimensionality for uncertainty estimation.
+            **unet_kwargs,               # Keyword arguments for UNet.
     ):
         super().__init__()
         self.img_resolution = img_resolution
         self.img_channels = img_channels
-        self.label_dim = label_dim
         self.use_fp16 = use_fp16
-        self.sigma_data = sigma_data
-        self.unet = UNet(img_resolution=img_resolution, img_channels=img_channels, label_dim=label_dim, **unet_kwargs)
+        self.unet = UNet(img_resolution=img_resolution, img_channels=img_channels, **unet_kwargs)
         self.logvar_fourier = MPFourier(logvar_channels)
         self.logvar_linear = MPConv(logvar_channels, 1, kernel=[])
+        
+        self.hyperparameters = {
+            "img_resolution": img_resolution,
+            "img_channels": img_channels,
+            "logvar_channels": logvar_channels,
+            **unet_kwargs,
+        }
 
-    def forward(self, x, sigma, class_labels=None, force_fp32=False, return_logvar=False, **unet_kwargs):
-        x = x.to(torch.float32)
-        sigma = sigma.to(torch.float32).reshape(-1, 1, 1, 1)
-        class_labels = None if self.label_dim == 0 else torch.zeros([1, self.label_dim], device=x.device) if class_labels is None else class_labels.to(torch.float32).reshape(-1, self.label_dim)
-        dtype = torch.float16 if (self.use_fp16 and not force_fp32 and x.device.type == 'cuda') else torch.float32
-
-        # Preconditioning weights.
-        c_skip = self.sigma_data ** 2 / (sigma ** 2 + self.sigma_data ** 2)
-        c_out = sigma * self.sigma_data / (sigma ** 2 + self.sigma_data ** 2).sqrt()
-        c_in = 1 / (self.sigma_data ** 2 + sigma ** 2).sqrt()
-        c_noise = sigma.flatten().log() / 4
-
-        # Run the model.
-        x_in = (c_in * x).to(dtype)
-        F_x = self.unet(x_in, c_noise, class_labels, **unet_kwargs)
-        D_x = c_skip * x + c_out * F_x.to(torch.float32)
+    def forward(self, t, x, *args, return_logvar=False, **unet_kwargs):
+        B, *D = x.shape
+        out = self.unet(t, x, *args, **unet_kwargs)
 
         # Estimate uncertainty if requested.
         if return_logvar:
-            logvar = self.logvar_linear(self.logvar_fourier(c_noise)).reshape(-1, 1, 1, 1)
+            logvar = self.logvar_linear(self.logvar_fourier(t)).reshape(-1, *[1]*len(D))
             return D_x, logvar # u(sigma) in Equation 21
         return D_x
 

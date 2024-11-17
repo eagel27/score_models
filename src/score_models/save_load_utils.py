@@ -110,8 +110,7 @@ def load_hyperparameters(path: str, key: str = "model_hparams") -> dict:
 
 def remove_oldest_checkpoint(path: str, models_to_keep: int = 5):
     """
-    Utility function to clean up old checkpoints in a directory.
-    This utility will delete the oldest checkpoints and their optimizer states.
+    Utility to delete the oldest checkpoints and their optimizer states.
     """
     if models_to_keep:
         paths = sorted(glob.glob(os.path.join(path, "*checkpoint*")), key=checkpoint_number)

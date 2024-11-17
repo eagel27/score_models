@@ -9,6 +9,7 @@ from ..sde import SDE
 from ..losses import dsm
 from ..solver import Solver, ODESolver
 from ..utils import DEVICE
+from ..save_load_utils import load_hyperparameters
 if TYPE_CHECKING:
     from score_models import HessianDiagonal
 
@@ -17,7 +18,13 @@ __all__ = ["ScoreModel"]
 
 
 class ScoreModel(Base):
-    def __new__(cls, *args, formulation: Literal["original", "edm"] = "original", **kwargs):
+    def __new__(cls, *args, **kwargs):
+        path = kwargs.get("path", None)
+        if path is not None:
+            hyperparameters = load_hyperparameters(path) 
+            formulation = hyperparameters.get("formulation", "original")
+        else:
+            formulation = kwargs.get("formulation", "original")
         if formulation.lower() == "edm":
             from score_models import EDMScoreModel
             return super().__new__(EDMScoreModel)
