@@ -10,7 +10,9 @@ Improved diffusion model architecture proposed in the paper
 Analyzing and Improving the Training Dynamics of Diffusion Models.
 
 Original implementation by: Tero Karras (https://github.com/NVlabs/edm2/blob/main/training/networks_edm2.py)
-Some modifications were made to adapt the code to the API.
+Some modifications were made to adapt the code to the API. 
+Some variable names were changed to match NCSNpp's API.
+Some functionalities were removed to simplify the code.
 """
 from typing import List, Optional, Literal
 from torch import Tensor
@@ -116,9 +118,9 @@ class MPFourier(torch.nn.Module):
     def forward(self, t): 
         emb = t.to(torch.float32)
         emb = torch.outer(emb, self.freqs.to(torch.float32))
-        y = y + self.phases.to(torch.float32)
-        y = y.cos() * np.sqrt(2)
-        return y.to(x.dtype)
+        emb = emb + self.phases.to(torch.float32)
+        emb = emb.cos() * np.sqrt(2)
+        return emb.to(t.dtype)
 
 #----------------------------------------------------------------------------
 # Magnitude-preserving convolution or fully-connected layer (Equation 47)
@@ -161,6 +163,7 @@ class Block(torch.nn.Module):
             res_balance: float                           = 0.3,      # Balance between main branch (0) and residual branch (1).
             attn_balance: float                          = 0.3,      # Balance between main branch (0) and self-attention (1).
             clip_act: Optional[float]                    = None,     # Clip output activations. None = do not clip. (Karras et al. 2023 used clip_act=256)
+            **kwargs, 
     ):
         super().__init__()
         self.out_channels = out_channels
@@ -224,13 +227,11 @@ class Block(torch.nn.Module):
 class UNet(torch.nn.Module):
     def __init__(
             self,
-            img_resolution: int,                      # Image resolution.
-            img_channels: int,                        # Image channels.
+            pixels: int,                              # Image resolution.
+            channels: int,                            # Image channels.
             # label_dim,                              # Class label dimensionality. 0 = unconditional.
-            model_channels: int             = 192,    # Base multiplier for the number of channels.
-            channel_mult: List[int]         = [1,2,3,4], # Per-resolution multipliers for the number of channels.
-            channel_mult_noise: Optional[int] = None, # Multiplier for noise embedding dimensionality. None = select based on channel_mult.
-            channel_mult_emb: Optional[int] = None,   # Multiplier for final embedding dimensionality. None = select based on channel_mult.
+            nf: int                         = 192,    # Base multiplier for the number of channels.
+            ch_mult: List[int]              = [1,2,3,4], # Per-resolution multipliers for the number of channels.
             num_blocks: int                 = 3,      # Number of residual blocks per resolution.
             attn_resolutions: List[int]     = [16,8], # List of resolutions with self-attention.
             label_balance: float            = 0.5,    # Balance between noise embedding (0) and class embedding (1).
@@ -239,9 +240,9 @@ class UNet(torch.nn.Module):
             **block_kwargs,                           # Arguments for Block.
     ):
         super().__init__()
-        cblock = [model_channels * x for x in channel_mult]
-        cnoise = model_channels * channel_mult_noise if channel_mult_noise is not None else cblock[0]
-        cemb = model_channels * channel_mult_emb if channel_mult_emb is not None else max(cblock)
+        cblock = [nf * m for m in ch_mult]
+        cnoise = cblock[0]
+        cemb = max(cblock)
         self.label_balance = label_balance
         self.concat_balance = concat_balance
         self.out_gain = torch.nn.Parameter(torch.zeros([]))
@@ -253,25 +254,25 @@ class UNet(torch.nn.Module):
 
         # Encoder.
         self.enc = torch.nn.ModuleDict()
-        cout = img_channels + 1
-        for level, channels in enumerate(cblock):
-            res = img_resolution >> level
+        cout = channels + 1
+        for level, ch in enumerate(cblock):
+            res = pixels >> level
             if level == 0:
                 cin = cout
-                cout = channels
+                cout = ch
                 self.enc[f'{res}x{res}_conv'] = MPConv(cin, cout, kernel=[3,3])
             else:
                 self.enc[f'{res}x{res}_down'] = Block(cout, cout, cemb, flavor='enc', resample_mode='down', **block_kwargs)
             for idx in range(num_blocks):
                 cin = cout
-                cout = channels
+                cout = ch
                 self.enc[f'{res}x{res}_block{idx}'] = Block(cin, cout, cemb, flavor='enc', attention=(res in attn_resolutions), **block_kwargs)
 
         # Decoder.
         self.dec = torch.nn.ModuleDict()
         skips = [block.out_channels for block in self.enc.values()]
-        for level, channels in reversed(list(enumerate(cblock))):
-            res = img_resolution >> level
+        for level, ch in reversed(list(enumerate(cblock))):
+            res = pixels >> level
             if level == len(cblock) - 1:
                 self.dec[f'{res}x{res}_in0'] = Block(cout, cout, cemb, flavor='dec', attention=True, **block_kwargs)
                 self.dec[f'{res}x{res}_in1'] = Block(cout, cout, cemb, flavor='dec', **block_kwargs)
@@ -279,9 +280,9 @@ class UNet(torch.nn.Module):
                 self.dec[f'{res}x{res}_up'] = Block(cout, cout, cemb, flavor='dec', resample_mode='up', **block_kwargs)
             for idx in range(num_blocks + 1):
                 cin = cout + skips.pop()
-                cout = channels
+                cout = ch
                 self.dec[f'{res}x{res}_block{idx}'] = Block(cin, cout, cemb, flavor='dec', attention=(res in attn_resolutions), **block_kwargs)
-        self.out_conv = MPConv(cout, img_channels, kernel=[3,3])
+        self.out_conv = MPConv(cout, channels, kernel=[3,3])
 
     def forward(self, t, x, *args, **kwargs):
         # Embedding.
@@ -316,34 +317,33 @@ class EDMv2Net(torch.nn.Module):
     """
     def __init__(
             self,
-            img_resolution: int,         # Image resolution.
-            img_channels: int,           # Image channels.
+            pixels: int,                 # Image resolution.
+            channels: int,               # Image channels.
             logvar_channels: int = 128,  # Intermediate dimensionality for uncertainty estimation.
             **unet_kwargs,               # Keyword arguments for UNet.
     ):
         super().__init__()
-        self.img_resolution = img_resolution
-        self.img_channels = img_channels
-        self.use_fp16 = use_fp16
-        self.unet = UNet(img_resolution=img_resolution, img_channels=img_channels, **unet_kwargs)
+        self.pixels = pixels
+        self.channels = channels
+        self.unet = UNet(pixels=pixels, channels=channels, **unet_kwargs)
         self.logvar_fourier = MPFourier(logvar_channels)
         self.logvar_linear = MPConv(logvar_channels, 1, kernel=[])
         
         self.hyperparameters = {
-            "img_resolution": img_resolution,
-            "img_channels": img_channels,
+            "pixels": pixels,
+            "channels": channels,
             "logvar_channels": logvar_channels,
             **unet_kwargs,
         }
 
-    def forward(self, t, x, *args, return_logvar=False, **unet_kwargs):
+    def forward(self, t, x, *args, return_logvar=False, **kwargs):
         B, *D = x.shape
-        out = self.unet(t, x, *args, **unet_kwargs)
+        out = self.unet(t, x, *args, **kwargs)
 
         # Estimate uncertainty if requested.
         if return_logvar:
             logvar = self.logvar_linear(self.logvar_fourier(t)).reshape(-1, *[1]*len(D))
-            return D_x, logvar # u(sigma) in Equation 21
-        return D_x
+            return out, logvar # u(sigma) in Equation 21
+        return out
 
 #----------------------------------------------------------------------------

@@ -266,6 +266,9 @@ def load_architecture(
         elif net.lower() == "encoder":
             from score_models import Encoder
             net = Encoder(**hyperparameters).to(device)
+        elif net.lower() == "edmv2net":
+            from score_models import EDMv2Net
+            net = EDMv2Net(**hyperparameters).to(device)
         else:
             raise ValueError(f"Architecture {net} not recognized.")
     else:
