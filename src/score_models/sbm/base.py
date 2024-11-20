@@ -94,6 +94,8 @@ class Base(Module, ABC):
         path: Optional[str] = None,
         optimizer: Optional[torch.optim.Optimizer] = None,
         create_path: bool = True,
+        step: Optional[int] = None, # Iteration number
+        sigma_rel: Optional[float] = None, # Relative EMA length scale
     ):
         """
         Save the model checkpoint to the provided path or the path provided during initialization.
@@ -102,6 +104,8 @@ class Base(Module, ABC):
             path (str, optional): The path to save the checkpoint. Default is path provided during initialization.
             optimizer (torch.optim.Optimizer, optional): Optimizer to save alongside the checkpoint. Default is None.
             create_path (bool, optional): Whether to create the path if it does not exist. Default is True.
+            step (int, optional): The iteration number to save. Default is None.
+            sigma_rel (float, optional): The relative EMA length scale to save. Default is None.
         """
         path = path or self.path
         if path:
@@ -151,19 +155,21 @@ class Base(Module, ABC):
         self,
         dataset: torch.utils.data.Dataset,
         epochs: int = 1,
+        batch_size: Optional[int] = None,
         learning_rate: float = 1e-4,
         learning_rate_decay: Optional[int] = None,
-        ema_decay: float = 0.999,
-        clip: float = 0.0,
+        clip: float = 1.,
         warmup: int = 0,
-        optimizer: Optional[torch.optim.Optimizer] = None,
-        preprocessing: Optional[Callable] = None,
-        batch_size: Optional[int] = None,
-        shuffle: bool = False,
+        sigma_rel: Union[float, (list, tuple)] = 0.13,
+        ema_decay: Optional[float] = None, # Traditional EMA
+        update_ema_after_step: int = 100, # Parameter to delay update of traditional EMA
+        update_model_with_ema_every: Optional[int] = None, # Parameter to reset the online model with EMA ala Hare and Tortoise (https://arxiv.org/abs/2406.02596)
         iterations_per_epoch: Optional[int] = None,
         max_time: float = float("inf"),
         checkpoint_every: int = 10,
         models_to_keep: int = 1,
+        shuffle: bool = False,
+        optimizer: Optional[torch.optim.Optimizer] = None,
         path: Optional[str] = None,
         name_prefix: Optional[str] = None,
         seed: Optional[int] = None,
@@ -172,30 +178,32 @@ class Base(Module, ABC):
         # Backward compatibility
         if "checkpoints_directory" in kwargs and path is None:
             path = kwargs["checkpoints_directory"]
-        if "preprocessing_fn" in kwargs and preprocessing is None:
-            preprocessing = kwargs["preprocessing_fn"]
+        if "preprocessing_fn" in kwargs or "preprocessing" in kwargs:
+            raise NotImplementedError("The 'preprocessing' argument has been removed. The preprocessing must be performed in the dataset.")
         if "checkpoints" in kwargs and checkpoint_every is None:
             checkpoint_every = kwargs["checkpoints"]
         trainer = Trainer(
             model=self,
             dataset=dataset,
-            preprocessing=preprocessing,
-            batch_size=batch_size,
-            shuffle=shuffle,
             epochs=epochs,
+            batch_size=batch_size,
+            learning_rate=learning_rate,
+            learning_rate_decay=learning_rate_decay,
+            clip=clip,
+            warmup=warmup,
+            sigma_rel=sigma_rel,
+            ema_decay=ema_decay,
+            update_ema_after_step=update_ema_after_step,
+            update_model_with_ema_every=update_model_with_ema_every,
             iterations_per_epoch=iterations_per_epoch,
             max_time=max_time,
             optimizer=optimizer,
-            learning_rate=learning_rate,
-            learning_rate_decay=learning_rate_decay,
-            ema_decay=ema_decay,
-            clip=clip,
-            warmup=warmup,
             checkpoint_every=checkpoint_every,
             models_to_keep=models_to_keep,
             path=path,
             name_prefix=name_prefix,
             seed=seed,
+            shuffle=shuffle,
         )
         losses = trainer.train()
         return losses

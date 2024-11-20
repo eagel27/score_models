@@ -7,7 +7,8 @@ import json, os
 import time
 import numpy as np
 from torch.utils.data import DataLoader, Dataset
-from torch_ema import ExponentialMovingAverage
+# from torch_ema import ExponentialMovingAverage
+from ema_pytorch import EMA, KarrasEMA
 from datetime import datetime
 from tqdm import tqdm
 
@@ -31,32 +32,46 @@ class Trainer:
         epochs: int = 100,
         batch_size: Optional[int] = None,
         learning_rate: float = 1e-3,
-        ema_decay: float = 0.999,
+        sigma_rel: Union[float, (list, tuple)] = 0.13,
         clip: float = 1.,
         warmup: int = 0,
         learning_rate_decay: Optional[int] = None, # Number of epochs before decaying learning rate with a square root decay schedule
         optimizer: Optional[torch.optim.Optimizer] = None,
-        preprocessing: Optional[Callable] = None,
         shuffle: bool = False,
         iterations_per_epoch: Optional[int] = None,
         max_time: float = float('inf'),
         checkpoint_every: int = 10,
-        models_to_keep: int = 3,
+        models_to_keep: int = 1,
+        total_checkpoints_to_save: Optional[int] = None,
         path: Optional[str] = None,
         name_prefix: Optional[str] = None,
         seed: Optional[int] = None,
-    ):
+        ema_decay: Optional[float] = None, # Traditional EMA
+        update_ema_after_step: int = 100, # Parameter to delay update of traditional EMA
+        update_model_with_ema_every: Optional[int] = None, # Parameter to reset the online model with EMA ala Hare and Tortoise (https://arxiv.org/abs/2406.02596)
+        ): 
+        # Model
         self.model = model
         self.net = model.net # Neural network to train
+        
+        # Data
         if batch_size is not None:
             self.dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
         else:
             self.dataloader = dataset
         self.data_iter = iter(self.dataloader)
-        self.preprocessing = preprocessing or (lambda x: x)
         self.lr = learning_rate
         self.optimizer = optimizer or torch.optim.Adam(self.model.parameters(), lr=learning_rate)
-        self.ema = ExponentialMovingAverage(self.model.parameters(), decay=ema_decay)
+        if ema_decay:
+            print("It is recommended to use the Karras EMA with sigma_rel instead of the traditional EMA."
+                  " sigma_rel is set to 0.13 by default, a number between 0 and 1. Set ema_decay to None (default) to use Karras EMA.")
+            # self.ema = ExponentialMovingAverage(self.model.parameters(), decay=ema_decay) # torch_ema
+            self.emas = [EMA(self.model, beta=ema_decay, update_after_step=update_ema_after_step)] # ema_pytorch
+        else:
+            if not isinstance(sigma_rel, (list, tuple)):
+                sigma_rel = [sigma_rel]
+            self.emas = [KarrasEMA(self.model, sigma_rel=sigma) for sigma in sigma_rel] # ema_pytorch
+            # print("Using Karras EMA with sigma_rel =", sigma_rel)
         self.iterations_per_epoch = iterations_per_epoch or len(self.dataloader)
         
         # Learning rate schedules
@@ -83,6 +98,11 @@ class Trainer:
         self.checkpoint_every = checkpoint_every
         self.models_to_keep = models_to_keep
         self.max_time = max_time
+        if total_checkpoints_to_save:
+            # Implement some logic to recalculate the total number of checkpoints to save based on resources (epochs, max_time, etc.)
+            # This is super useful for PostHocEMA, where we want to save a specific number of snapshots.
+            # The logic here will override the models_to_keep parameter and checkpoint_every parameter.
+            raise NotImplementedError("total_checkpoints_to_save is not implemented yet.")
         
         # Provided model already has a path to load a checkpoint from
         if path and self.model.path:
@@ -120,7 +140,6 @@ class Trainer:
                     json.dump(
                         {
                             "dataset": dataset.__class__.__name__,
-                            "preprocessing": preprocessing.__name__ if preprocessing is not None else None,
                             "optimizer": self.optimizer.__class__.__name__,
                             "learning_rate": self.lr,
                             "ema_decay": ema_decay,
@@ -149,7 +168,7 @@ class Trainer:
             file = os.path.join(self.path, "loss.txt")
             if not os.path.isfile(file):
                 with open(file, "w") as f:
-                    f.write("checkpoint step loss\n")
+                    f.write("checkpoint step loss time_per_step\n")
             else:
                 # Grab the last checkpoint and step
                 self.global_step = load_global_step(self.path)
@@ -161,18 +180,22 @@ class Trainer:
             self.path = None
             print("No path provided. Training checkpoints will not be saved.")
 
-    def save_checkpoint(self, loss: float):
+    def save_checkpoint(self, loss: float, time_per_step):
         """
         Save model and optimizer if a path is provided. Then save loss and remove oldest checkpoints
         when the number of checkpoints exceeds models_to_keep.
         """
         if self.path:
-            with self.ema.average_parameters():
-                self.model.save(self.path, optimizer=self.optimizer)
+            ## torch_ema
+            # with self.ema.average_parameters():
+                # self.model.save(self.path, optimizer=self.optimizer)
+            ## ema_pytorch
+            for ema in self.emas:
+                ema.ema_model.save(self.path, optimizer=self.optimizer)
         
             checkpoint = last_checkpoint(self.path)
             with open(os.path.join(self.path, "loss.txt"), "a") as f:
-                f.write(f"{checkpoint} {self.global_step} {loss}\n")
+                f.write(f"{checkpoint} {self.global_step} {loss} {time_per_step}\n")
                 
             if self.models_to_keep:
                 remove_oldest_checkpoint(self.path, self.models_to_keep)
@@ -193,8 +216,6 @@ class Trainer:
             else:
                 x = X
                 args = []
-            # Preprocessing
-            x = self.preprocessing(x)
             # Training step
             self.optimizer.zero_grad()
             loss = self.model.loss(x, *args, step=self.global_step)
@@ -202,7 +223,8 @@ class Trainer:
             if self.clip > 0:
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.clip)
             self.optimizer.step()
-            self.ema.update()
+            for ema in self.emas:
+                ema.update()
             self.lr_scheduler.step()
             # Logging
             time_per_step_avg += time.time() - start
@@ -237,7 +259,7 @@ class Trainer:
             if (time.time() - global_start) > self.max_time * 3600:
                 out_of_time = True
             if (epoch + 1) % self.checkpoint_every == 0 or epoch == self.epochs - 1 or out_of_time:
-                self.save_checkpoint(cost)
+                self.save_checkpoint(cost, time_per_step_avg)
             if out_of_time:
                 print("Out of time")
                 break
@@ -246,5 +268,6 @@ class Trainer:
 
         print(f"Finished training after {(time.time() - global_start) / 3600:.3f} hours.")
         # Save EMA weights in the model for dynamic use (e.g. Jupyter notebooks)
-        self.ema.copy_to(self.model.parameters())
+        # self.ema.copy_to(self.model.parameters()) ## torch_ema
+        self.emas[0].copy_params_from_ema_to_model() ## ema_pytorch
         return losses

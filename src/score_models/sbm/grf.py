@@ -1,8 +1,8 @@
 import torch
 from torch import Tensor
 
-from ..sde import SDE
 from .energy_model import EnergyModel
+from ..sde import SDE
 from ..architectures import NullNet
 
 
@@ -54,7 +54,13 @@ class GRFEnergyModel(EnergyModel):
         return nll
 
     def unnormalized_energy(self, t: Tensor, x: Tensor, *args, **kwargs):
-        raise RuntimeError("Unnormalized energy should not be called for GRF models.")
+        raise RuntimeError("Unnormalized energy is not defined for GRF models.")
 
     def reparametrized_score(self, t, x, *args, **kwargs):
-        raise RuntimeError("Reparametrized score should not be called for GRF models.")
+        raise RuntimeError("Reparametrized score is not defined for GRF models.")
+
+    def save(self, *args, **kwargs):
+        raise NotImplementedError("GRF models cannot yet be saved.")
+    
+    def load(self, *args, **kwargs):
+        raise NotImplementedError("GRF models cannot yet be loaded.")

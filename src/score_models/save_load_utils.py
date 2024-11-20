@@ -49,18 +49,20 @@ def save_checkpoint(
         model: Module,
         path: str,
         create_path: bool = True,
-        key: Literal["checkpoint", "optimizer", "lora_checkpoint"] = "checkpoint"
+        key: Literal["checkpoint", "optimizer", "lora_checkpoint"] = "checkpoint",
+        step: Optional[int] = None,
+        sigma_rel: Optional[float] = None,
         ):
     """
     Utility function to save checkpoints of a model and its optimizer state. 
     This utility will save files in path with the following pattern
     ```
         Path
-        ├── checkpoint_001.pt
-        ├── checkpoint_002.pt
+        ├── checkpoint_*_001.pt
+        ├── checkpoint_*_002.pt
         ├── ...
-        ├── optimizer_001.pt
-        ├── optimizer_002.pt
+        ├── optimizer_*_001.pt
+        ├── optimizer_*_002.pt
         ├── ...
     ```
     
@@ -69,6 +71,8 @@ def save_checkpoint(
         path: Path to a directory where to save the checkpoint files. Defaults to the path in the ScoreModel instance.
         create_path: If True, create the directory if it does not exist.
         key: Key to save the checkpoint with. Defaults to "checkpoint". Alternative is "optimizer".
+        step: The iteration number to save. This information is saved in the filename.
+        sigma_rel: The relative EMA length scale to save. This information is saved in the filename.
     """
     if not os.path.isdir(path):
         if create_path:

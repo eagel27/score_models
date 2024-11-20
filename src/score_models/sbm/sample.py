@@ -62,3 +62,12 @@ class SampleScoreModel(ScoreModel):
             dim=1,
         )  # B, *D
         return scores
+    
+    def reparametrized_score(self, t: Tensor, x: Tensor, *args, **kwargs):
+        raise RuntimeError("Reparametrized score is not defined for sample models.")
+
+    def save(self, *args, **kwargs):
+        raise RuntimeError("Sample models cannot be saved.")
+
+    def load(self, *args, **kwargs):
+        raise RuntimeError("Sample models cannot be loaded.")

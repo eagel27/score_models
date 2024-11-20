@@ -1,12 +1,12 @@
 from typing import Optional
 
 import torch
-from torch import Tensor
 import numpy as np
+from torch import Tensor
 
-from ..sde import SDE
 from .energy_model import EnergyModel
 from .score_model import ScoreModel
+from ..sde import SDE
 from ..architectures import NullNet
 
 
@@ -105,6 +105,12 @@ class MVGEnergyModel(EnergyModel):
 
     def reparametrized_score(self, t, x, *args, **kwargs):
         raise RuntimeError("Reparametrized score should not be called for MVG models.")
+    
+    def save(self, *args, **kwargs):
+        raise NotImplementedError("MVG models cannot yet be saved.")
+    
+    def load(self, *args, **kwargs):
+        raise NotImplementedError("MVG models cannot yet be loaded.")
 
 
 class MVGScoreModel(ScoreModel):
@@ -237,3 +243,9 @@ class MVGScoreModel(ScoreModel):
 
     def reparametrized_score(self, t, x, *args, **kwargs):
         raise RuntimeError("Reparametrized score should not be called for MVG models.")
+    
+    def save(self, *args, **kwargs):
+        raise NotImplementedError("MVG models cannot yet be saved.")
+
+    def load(self, *args, **kwargs):
+        raise NotImplementedError("MVG models cannot yet be loaded.")

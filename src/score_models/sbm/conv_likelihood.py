@@ -4,8 +4,8 @@ from torch import vmap
 import torch
 import numpy as np
 
-from ..sde import SDE
 from .energy_model import EnergyModel
+from ..sde import SDE
 from ..architectures import NullNet
 
 
@@ -93,7 +93,6 @@ class ConvolvedLikelihood(EnergyModel):
             r = self.y - self.A(xt)
         else:
             r = self.y - (self.A @ xt.reshape(-1, 1)).reshape(*self.y_shape)
-
         nll = 0.5 * torch.sum(r**2 * sigma)
         return nll
 
@@ -106,18 +105,22 @@ class ConvolvedLikelihood(EnergyModel):
         return nll.squeeze()
 
     def full_energy(self, t, xt, *args, sigma, **kwargs):
-
         return vmap(self._full_forward, in_dims=(0, 0, None))(t, xt, sigma)
 
     def score(self, t, x, *args, **kwargs):
         # Compute sigma once per time step
         sigma = self.Sigma_y * self.sde.mu(t[0]) ** 2 + self.sde.sigma(t[0]) ** 2 * self.AAT
         sigma = 1 / sigma if self.diag else torch.linalg.inv(sigma)
-
         return super().score(t, x, *args, sigma=sigma, **kwargs)
 
     def unnormalized_energy(self, t: Tensor, x: Tensor, *args, **kwargs):
-        raise RuntimeError("Unnormalized energy should not be called for analytic models.")
+        raise RuntimeError("Unnormalized energy is not defined for analytic models.")
 
     def reparametrized_score(self, t, x, *args, **kwargs):
-        raise RuntimeError("Reparametrized score should not be called for analytic models.")
+        raise RuntimeError("Reparametrized score is not defined for analytic models.")
+    
+    def save(self, *args, **kwargs):
+        raise NotImplementedError("ConvolvedLikelihood models cannot yet be saved.")
+    
+    def load(self, *args, **kwargs):
+        raise NotImplementedError("ConvolvedLikelihood models cannot yet be loaded.")

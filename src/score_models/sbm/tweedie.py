@@ -4,8 +4,8 @@ import torch
 from torch.func import grad
 from torch import vmap, Tensor
 
-from ..sde import SDE
 from . import ScoreModel
+from ..sde import SDE
 from ..architectures import NullNet
 
 
@@ -13,9 +13,8 @@ class TweedieScoreModel(ScoreModel):
     """
     Convolved likelihood score model using Tweedie's Formula.
 
-    Based on Chung et al. 2022 (doi: 10.48550/arXiv.2209.14687) though we use
-    the jacobian to properly propagate the score. Uses the score of the expected
-    value as an approximation of the expectation of the score.
+    Based on Chung et al. 2022 (doi: 10.48550/arXiv.2209.14687) though we 
+    use an annealing prescription to anneal the score. 
 
     Args:
         sde: The SDE that the score model is associated with.
@@ -60,3 +59,12 @@ class TweedieScoreModel(ScoreModel):
         x0, vjp_func = torch.func.vjp(lambda xt: self.tweedie(t, xt, *args, **kwargs), x)
         score0 = self.log_likelihood_score0(t, x0, *args, **kwargs)
         return vjp_func(score0)[0]
+    
+    def reparametrized_score(self, t: Tensor, x: Tensor, *args, **kwargs):
+        raise RuntimeError("Reparametrized score not implemented for TweedieScoreModel.")
+    
+    def save(self, *args, **kwargs):
+        raise NotImplementedError("Saving not implemented for TweedieScoreModel.")
+    
+    def load(self, *args, **kwargs):
+        raise NotImplementedError("Loading not implemented for TweedieScoreModel.")
