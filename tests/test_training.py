@@ -1,5 +1,5 @@
 from torch.utils.data import TensorDataset
-from score_models import ScoreModel, EnergyModel, SLIC, HessianDiagonal, LoRAScoreModel, MLP, NCSNpp, DDPM
+from score_models import ScoreModel, EnergyModel, SLIC, HessianDiagonal, LoRAScoreModel, MLP, NCSNpp, DDPM, EDMv2Net
 from functools import partial
 import pytest
 import torch
@@ -377,3 +377,43 @@ def test_backward_compatibility_optimizer_state(tmp_path, capsys):
     print(captured.out)
     assert f"Resumed training from checkpoint {E}." in captured.out
     assert f"Loaded optimizer {E} from test." in captured.out
+
+
+def test_lr_scheduler_with_edm(tmp_path):
+    E = 10
+    B = 2
+    C = 3
+    N = 4
+    D = [8, 8]
+    dataset = Dataset(N, C, dimensions=D)
+    net = EDMv2Net(8, C, ch_mult=(2, 2), nf=8)
+    model = ScoreModel(net, "vp", formulation="edm")
+    
+    losses = model.fit(
+            dataset, 
+            learning_rate=1e-3,
+            learning_rate_decay=10,
+            batch_size=B, 
+            epochs=E, 
+            path=tmp_path, 
+            checkpoint_every=1, 
+            models_to_keep=1,
+            )
+
+    new_model = ScoreModel(path=tmp_path)
+    assert new_model.loaded_checkpoint == E, f"Expected loaded_checkpoint to be {E}, got {new_model.loaded_checkpoint}"
+    
+    from score_models import Trainer
+    # # Do not provide the path, it is inferred from the model
+    trainer = Trainer(
+            model=new_model,
+            dataset=dataset,
+            learning_rate=1e-3,
+            learning_rate_decay=10,
+            batch_size=B,
+            epochs=E,
+            checkpoint_every=1,
+            models_to_keep=1
+            )
+    assert trainer.global_step == E * len(dataset) // B, f"Expected global_step to be {E * len(dataset) // B}, got {trainer.global_step}"
+    

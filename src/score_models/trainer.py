@@ -15,8 +15,12 @@ from .utils import DEVICE
 from .save_load_utils import (
         remove_oldest_checkpoint, 
         last_checkpoint,
-        load_checkpoint
+        load_checkpoint,
+        load_global_step
         )
+
+
+__all__ = ["Trainer"]
 
 
 class Trainer:
@@ -28,8 +32,9 @@ class Trainer:
         batch_size: Optional[int] = None,
         learning_rate: float = 1e-3,
         ema_decay: float = 0.999,
-        clip: float = 0.,
+        clip: float = 1.,
         warmup: int = 0,
+        learning_rate_decay: Optional[int] = None, # Number of epochs before decaying learning rate with a square root decay schedule
         optimizer: Optional[torch.optim.Optimizer] = None,
         preprocessing: Optional[Callable] = None,
         shuffle: bool = False,
@@ -49,18 +54,34 @@ class Trainer:
             self.dataloader = dataset
         self.data_iter = iter(self.dataloader)
         self.preprocessing = preprocessing or (lambda x: x)
+        self.lr = learning_rate
         self.optimizer = optimizer or torch.optim.Adam(self.model.parameters(), lr=learning_rate)
         self.ema = ExponentialMovingAverage(self.model.parameters(), decay=ema_decay)
-        self.lr = learning_rate
-        self.clip = clip
-        self.warmup = warmup
+        self.iterations_per_epoch = iterations_per_epoch or len(self.dataloader)
+        
+        # Learning rate schedules
         self.global_step = 0
+        if learning_rate_decay:
+            assert learning_rate_decay > 0, "learning_rate_decay must be a positive integer."
+        def inverse_sqrt_schedule(step: int):
+            if learning_rate_decay is None:
+                return 1.0
+            return 1 / np.sqrt(max((step - warmup) / learning_rate_decay, 1))
+        def warmup_schedule(step: int):
+            if warmup == 0:
+                return 1.0
+            return np.minimum(step / warmup, 1.0)
+        self.lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+            optimizer=self.optimizer,
+            # Use self.global_step, so that we can reload training from a checkpoint and have the correct learning rate
+            lr_lambda=lambda step: warmup_schedule(self.global_step) * inverse_sqrt_schedule(self.global_step)
+        )
+        self.clip = clip
         if seed:
             torch.manual_seed(seed)
         self.epochs = epochs
         self.checkpoint_every = checkpoint_every
         self.models_to_keep = models_to_keep
-        self.iterations_per_epoch = iterations_per_epoch or len(self.dataloader)
         self.max_time = max_time
         
         # Provided model already has a path to load a checkpoint from
@@ -77,9 +98,11 @@ class Trainer:
                         key="optimizer",
                         device=self.model.device
                         )
+                # Resume global step
+                self.global_step = load_global_step(self.model.path, self.model.loaded_checkpoint)
                 print(f"Resumed training from checkpoint {checkpoint}.")
             
-        # Create a new checkpoint and save checkpoint there 
+        # Create a new checkpoint and save checkpoint there
         if path:
             self.path = path
             if name_prefix: # Instantiate a new model, stamped with the current time
@@ -99,8 +122,10 @@ class Trainer:
                             "dataset": dataset.__class__.__name__,
                             "preprocessing": preprocessing.__name__ if preprocessing is not None else None,
                             "optimizer": self.optimizer.__class__.__name__,
-                            "learning_rate": self.optimizer.param_groups[0]["lr"],
+                            "learning_rate": self.lr,
                             "ema_decay": ema_decay,
+                            "learning_rate_decay": learning_rate_decay,
+                            "iterations_per_epoch": iterations_per_epoch,
                             "batch_size": batch_size,
                             "shuffle": shuffle,
                             "epochs": epochs,
@@ -113,13 +138,22 @@ class Trainer:
                             "path": str(path),
                             "model_name": model_name,
                             "name_prefix": name_prefix,
-                            "iterations_per_epoch": iterations_per_epoch
                         },
                         f,
                         indent=4
                     )
             # Save model hyperparameters to reconstruct the model later
             self.model.save_hyperparameters(path)
+            
+            # Create the loss.txt file
+            file = os.path.join(self.path, "loss.txt")
+            if not os.path.isfile(file):
+                with open(file, "w") as f:
+                    f.write("checkpoint step loss\n")
+            else:
+                # Grab the last checkpoint and step
+                self.global_step = load_global_step(self.path)
+        
         elif self.model.path:
             # Continue saving checkpoints in the model path
             self.path = self.model.path
@@ -137,8 +171,8 @@ class Trainer:
                 self.model.save(self.path, optimizer=self.optimizer)
         
             checkpoint = last_checkpoint(self.path)
-            with open(os.path.join(self.path, "score_sheet.txt"), "a") as f:
-                f.write(f"{checkpoint} {loss}\n")
+            with open(os.path.join(self.path, "loss.txt"), "a") as f:
+                f.write(f"{checkpoint} {self.global_step} {loss}\n")
                 
             if self.models_to_keep:
                 remove_oldest_checkpoint(self.path, self.models_to_keep)
@@ -165,13 +199,11 @@ class Trainer:
             self.optimizer.zero_grad()
             loss = self.model.loss(x, *args, step=self.global_step)
             loss.backward()
-            if self.global_step < self.warmup:
-                for g in self.optimizer.param_groups:
-                    g['lr'] = self.lr * np.minimum(self.global_step / self.warmup, 1.0)
             if self.clip > 0:
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.clip)
             self.optimizer.step()
             self.ema.update()
+            self.lr_scheduler.step()
             # Logging
             time_per_step_avg += time.time() - start
             cost += loss.item()

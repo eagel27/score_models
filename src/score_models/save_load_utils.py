@@ -149,7 +149,7 @@ def load_sbm_state(sbm: "ScoreModel", path: str, device=DEVICE):
 
 def load_optimizer_state(optimizer: torch.optim.Optimizer, path: str, raise_error: bool = True, device=DEVICE):
     try:
-        optimizer.load_state_dict(torch.load(path, map_location=device, weights_only=True))
+        optimizer.load_state_dict(torch.load(path, map_location=device, weights_only=False))
     except (KeyError, RuntimeError) as e:
         if raise_error:
             print(e)
@@ -160,6 +160,24 @@ def load_lora_state(lora_sbm: "LoRAScoreModel", path: str, device=DEVICE):
 
 # def load_scalar_net(posterior_sbm: "LoRAPosteriorScoreModel", path: str):
     # posterior_sbm.scalar_net.load_state_dict(torch.load(path, map_location=posterior_sbm.device))
+
+def load_global_step(
+        path: str,
+        checkpoint: Optional[int] = None,
+        ):
+    file = os.path.join(path, f"loss.txt")
+    if not os.path.isfile(file):
+        return 0
+    with open(file, "r") as f:
+        lines = f.readlines()
+        for line in reversed(lines):
+            ch, step, loss = line.split()
+            if checkpoint is None:
+                return int(step) # Return the last step
+            if int(ch) == checkpoint:
+                return int(step)
+    # Case where checkpoint does not exist in the file
+    return 0
         
 def load_checkpoint(
         model: Module,

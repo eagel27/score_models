@@ -80,6 +80,8 @@ class Base(Module, ABC):
         if "model_architecture" not in self.hyperparameters:
             self.hyperparameters["model_architecture"] = self.net.__class__.__name__.lower()
         self.model = self.net
+        params = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        print(f"{self.net.__class__.__name__} network has {params/1e6:.2f}M parameters.")
 
     def forward(self, t, x, *args, **kwargs) -> Tensor:
         return self.net(t, x, *args, **kwargs)
@@ -150,6 +152,7 @@ class Base(Module, ABC):
         dataset: torch.utils.data.Dataset,
         epochs: int = 1,
         learning_rate: float = 1e-4,
+        learning_rate_decay: Optional[int] = None,
         ema_decay: float = 0.999,
         clip: float = 0.0,
         warmup: int = 0,
@@ -184,6 +187,7 @@ class Base(Module, ABC):
             max_time=max_time,
             optimizer=optimizer,
             learning_rate=learning_rate,
+            learning_rate_decay=learning_rate_decay,
             ema_decay=ema_decay,
             clip=clip,
             warmup=warmup,
