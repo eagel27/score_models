@@ -5,7 +5,9 @@ import pytest
 import torch
 import shutil, os
 import numpy as np
+import glob
 
+    
 class Dataset(torch.utils.data.Dataset):
     def __init__(
             self, 
@@ -55,6 +57,24 @@ class Dataset(torch.utils.data.Dataset):
                     c_idx += 1
         return [x_.squeeze(0) for x_ in x] # Remove the batch dimension for dataloader
 
+def assert_checkpoint_was_saved(path, checkpoint, key="checkpoint"):
+    if key == "lora_checkpoint":
+        pattern = f"{key}*_{checkpoint:03d}"
+    else:
+        pattern = f"{key}*_{checkpoint:03d}.pt"
+    files = glob.glob(os.path.join(path, pattern))
+    assert len(files) == 1, f"Expected to find one checkpoint file, found {len(files)}"
+
+def assert_checkpoint_was_cleanedup(path, checkpoint, key="checkpoint"):
+    if key == "lora_checkpoint":
+        pattern = f"{key}*_{checkpoint:03d}"
+    else:
+        pattern = f"{key}*_{checkpoint:03d}.pt"
+    files = glob.glob(os.path.join(path, pattern))
+    assert len(files) == 0, f"Expected to find no checkpoint files, found {len(files)}"
+
+
+@pytest.mark.parametrize("ema_decay", [None, 0.999])
 @pytest.mark.parametrize("models_to_keep", [1, 2])
 @pytest.mark.parametrize("conditions", [
     (None, None, None), 
@@ -67,7 +87,7 @@ class Dataset(torch.utils.data.Dataset):
     ])
 @pytest.mark.parametrize("Net", [MLP, NCSNpp, DDPM])
 @pytest.mark.parametrize("B", [None, 2]) # Make sure we don't create a dataloader if batch_size is None
-def test_training_score_model(B, conditions, sde, Net, models_to_keep, tmp_path, capsys):
+def test_training_score_model(B, conditions, sde, Net, models_to_keep, ema_decay, tmp_path, capsys):
     condition_type, embeddings, channels = conditions
     hp = { # Hyperparameters for the dataset
             "ch_mult": (1, 1),
@@ -98,12 +118,11 @@ def test_training_score_model(B, conditions, sde, Net, models_to_keep, tmp_path,
     # Check that some improvement happens
     assert os.path.isfile(os.path.join(path, "model_hparams.json")), "model_hparams.json not found"
     assert os.path.isfile(os.path.join(path, "script_params.json")), "script_params.json not found"
-    for i in range(E+1-models_to_keep, E+1):
-        assert os.path.isfile(os.path.join(path, f"checkpoint_{i:03}.pt")), f"checkpoint_{i:03}.pt not found"
-        assert os.path.isfile(os.path.join(path, f"optimizer_{i:03}.pt")), f"optimizer_{i:03}.pt not found"
-    for i in range(0, E+1-models_to_keep): # Check that files are cleaned up
-        assert not os.path.exists(os.path.join(path, f"checkpoint_{i:03}.pt")), f"checkpoint_{i:03}.pt found, should not be there"
-        assert not os.path.exists(os.path.join(path, f"optimizer_{i:03}.pt")), f"optimizer_{i:03}.pt found, should not be there"
+    for key in ["checkpoint", "optimizer"]:
+        for i in range(E+1-models_to_keep, E+1):
+            assert_checkpoint_was_saved(path, i, key)
+        for i in range(0, E+1-models_to_keep): # Check that files are cleaned up
+            assert_checkpoint_was_cleanedup(path, i, key)
     
     # Test resume from checkpoint
     new_model = ScoreModel(path=path)
@@ -113,6 +132,7 @@ def test_training_score_model(B, conditions, sde, Net, models_to_keep, tmp_path,
             batch_size=B,
             epochs=E,
             checkpoint_every=1,
+            ema_decay=ema_decay,
             models_to_keep=models_to_keep
             )
     # Check stdout for the print statement declaring we resumed from a previous checkpoint for the optimizer
@@ -121,13 +141,11 @@ def test_training_score_model(B, conditions, sde, Net, models_to_keep, tmp_path,
     assert f"Resumed training from checkpoint {E}." in captured.out
     
     # Check that the new checkpoints are updated correctly
-    for i in range(2*E+1-models_to_keep, 2*E+1):
-        assert os.path.isfile(os.path.join(path, f"checkpoint_{i:03}.pt")), f"checkpoint_{i:03}.pt not found"
-        assert os.path.isfile(os.path.join(path, f"optimizer_{i:03}.pt")), f"optimizer_{i:03}.pt not found"
-    for i in range(E, 2*E+1-models_to_keep): # Check that files are cleaned up
-        assert not os.path.exists(os.path.join(path, f"checkpoint_{i:03}.pt")), f"checkpoint_{i:03}.pt found, should not be there"
-        assert not os.path.exists(os.path.join(path, f"optimizer_{i:03}.pt")), f"optimizer_{i:03}.pt found, should not be there"
-
+    for key in ["checkpoint", "optimizer"]:
+        for i in range(2*E+1-models_to_keep, 2*E+1):
+            assert_checkpoint_was_saved(path, i, key)
+        for i in range(E, 2*E+1-models_to_keep): # Check that files are cleaned up
+            assert_checkpoint_was_cleanedup(path, i, key)
 
 @pytest.mark.parametrize("Net", [MLP, NCSNpp])
 @pytest.mark.parametrize("sde", [
@@ -157,12 +175,11 @@ def test_training_energy_model(sde, Net, tmp_path, capsys):
     assert len(losses) == E, f"Expected {E} losses, got {len(losses)}"
     assert os.path.isfile(os.path.join(path, "model_hparams.json")), "model_hparams.json not found"
     assert os.path.isfile(os.path.join(path, "script_params.json")), "script_params.json not found"
-    for i in range(E+1-models_to_keep, E+1):
-        assert os.path.isfile(os.path.join(path, f"checkpoint_{i:03}.pt")), f"checkpoint_{i:03}.pt not found"
-        assert os.path.isfile(os.path.join(path, f"optimizer_{i:03}.pt")), f"optimizer_{i:03}.pt not found"
-    for i in range(0, E+1-models_to_keep): # Check that files are cleaned up
-        assert not os.path.exists(os.path.join(path, f"checkpoint_{i:03}.pt")), f"checkpoint_{i:03}.pt found, should not be there"
-        assert not os.path.exists(os.path.join(path, f"optimizer_{i:03}.pt")), f"optimizer_{i:03}.pt found, should not be there"
+    for key in ["checkpoint", "optimizer"]:
+        for i in range(E+1-models_to_keep, E+1):
+            assert_checkpoint_was_saved(path, i, key)
+        for i in range(0, E+1-models_to_keep): # Check that files are cleaned up
+            assert_checkpoint_was_cleanedup(path, i, key)
 
     # Test resume from checkpoint
     new_model = EnergyModel(path=path)
@@ -180,12 +197,11 @@ def test_training_energy_model(sde, Net, tmp_path, capsys):
     assert f"Resumed training from checkpoint {E}." in captured.out
     
     # Check that the new checkpoints are updated correctly
-    for i in range(2*E+1-models_to_keep, 2*E+1):
-        assert os.path.isfile(os.path.join(path, f"checkpoint_{i:03}.pt")), f"checkpoint_{i:03}.pt not found"
-        assert os.path.isfile(os.path.join(path, f"optimizer_{i:03}.pt")), f"optimizer_{i:03}.pt not found"
-    for i in range(E, 2*E+1-models_to_keep): # Check that files are cleaned up
-        assert not os.path.exists(os.path.join(path, f"checkpoint_{i:03}.pt")), f"checkpoint_{i:03}.pt found, should not be there"
-        assert not os.path.exists(os.path.join(path, f"optimizer_{i:03}.pt")), f"optimizer_{i:03}.pt found, should not be there"
+    for key in ["checkpoint", "optimizer"]:
+        for i in range(2*E+1-models_to_keep, 2*E+1):
+            assert_checkpoint_was_saved(path, i, key)
+        for i in range(E, 2*E+1-models_to_keep): # Check that files are cleaned up
+            assert_checkpoint_was_cleanedup(path, i, key)
 
 
 @pytest.mark.parametrize("conditions", [
@@ -229,12 +245,11 @@ def test_training_hessian_diagonal_model(conditions, loss, sde, Net, tmp_path, c
     assert os.path.isdir(os.path.join(path, "score_model")), "score_model directory not found, the base SBM has not been saved"
     assert os.path.isfile(os.path.join(path, "model_hparams.json")), "model_hparams.json not found"
     assert os.path.isfile(os.path.join(path, "script_params.json")), "script_params.json not found"
-    for i in range(E+1-models_to_keep, E+1):
-        assert os.path.isfile(os.path.join(path, f"checkpoint_{i:03}.pt")), f"checkpoint_{i:03}.pt not found"
-        assert os.path.isfile(os.path.join(path, f"optimizer_{i:03}.pt")), f"optimizer_{i:03}.pt not found"
-    for i in range(0, E+1-models_to_keep): # Check that files are cleaned up
-        assert not os.path.exists(os.path.join(path, f"checkpoint_{i:03}.pt")), f"checkpoint_{i:03}.pt found, should not be there"
-        assert not os.path.exists(os.path.join(path, f"optimizer_{i:03}.pt")), f"optimizer_{i:03}.pt found, should not be there"
+    for key in ["checkpoint", "optimizer"]:
+        for i in range(E+1-models_to_keep, E+1):
+            assert_checkpoint_was_saved(path, i, key)
+        for i in range(0, E+1-models_to_keep): # Check that files are cleaned up
+            assert_checkpoint_was_cleanedup(path, i, key)
 
     # Test resume from checkpoint
     new_model = HessianDiagonal(path=path)
@@ -252,13 +267,11 @@ def test_training_hessian_diagonal_model(conditions, loss, sde, Net, tmp_path, c
     assert f"Resumed training from checkpoint {E}." in captured.out
     
     # Check that the new checkpoints are updated correctly
-    for i in range(2*E+1-models_to_keep, 2*E+1):
-        assert os.path.isfile(os.path.join(path, f"checkpoint_{i:03}.pt")), f"checkpoint_{i:03}.pt not found"
-        assert os.path.isfile(os.path.join(path, f"optimizer_{i:03}.pt")), f"optimizer_{i:03}.pt not found"
-    for i in range(E, 2*E+1-models_to_keep): # Check that files are cleaned up
-        assert not os.path.exists(os.path.join(path, f"checkpoint_{i:03}.pt")), f"checkpoint_{i:03}.pt found, should not be there"
-        assert not os.path.exists(os.path.join(path, f"optimizer_{i:03}.pt")), f"optimizer_{i:03}.pt found, should not be there"
-
+    for key in ["checkpoint", "optimizer"]:
+        for i in range(2*E+1-models_to_keep, 2*E+1):
+            assert_checkpoint_was_saved(path, i, key)
+        for i in range(E, 2*E+1-models_to_keep): # Check that files are cleaned up
+            assert_checkpoint_was_cleanedup(path, i, key)
 
 @pytest.mark.parametrize("conditions", [
     (None, None, None), # conditions, embeddings, channels
@@ -304,13 +317,11 @@ def test_training_lora_model(conditions, lora_rank, sde, Net, tmp_path, capsys):
     assert os.path.isfile(os.path.join(path, "model_hparams.json")), "model_hparams.json not found"
     assert os.path.isfile(os.path.join(path, "script_params.json")), "script_params.json not found"
     print(os.listdir(path))
-    for i in range(E+1-models_to_keep, E+1):
-        assert os.path.isdir(os.path.join(path, f"lora_checkpoint_{i:03}")), f"lora_checkpoint_{i:03} not found"
-        assert os.path.isfile(os.path.join(path, f"optimizer_{i:03}.pt")), f"optimizer_{i:03}.pt not found"
-    for i in range(0, E+1-models_to_keep): # Check that files are cleaned up
-        assert not os.path.exists(os.path.join(path, f"lora_checkpoint_{i:03}")), f"lora_checkpoint_{i:03} found, should not be there"
-        assert not os.path.exists(os.path.join(path, f"optimizer_{i:03}.pt")), f"optimizer_{i:03}.pt found, should not be there"
-    
+    for key in ["lora_checkpoint", "optimizer"]:
+        for i in range(E+1-models_to_keep, E+1):
+            assert_checkpoint_was_saved(path, i, key)
+        for i in range(0, E+1-models_to_keep): # Check that files are cleaned up
+            assert_checkpoint_was_cleanedup(path, i, key)
 
     # Check the network is reloaded correctly
     new_model = LoRAScoreModel(path=path)
@@ -329,12 +340,11 @@ def test_training_lora_model(conditions, lora_rank, sde, Net, tmp_path, capsys):
     
     # Check that the new checkpoints are updated correctly
     print(os.listdir(path))
-    for i in range(2*E+1-models_to_keep, 2*E+1):
-        assert os.path.isdir(os.path.join(path, f"lora_checkpoint_{i:03}")), f"lora_checkpoint_{i:03} not found"
-        assert os.path.isfile(os.path.join(path, f"optimizer_{i:03}.pt")), f"optimizer_{i:03}.pt not found"
-    for i in range(E, 2*E+1-models_to_keep): # Check that files are cleaned up
-        assert not os.path.exists(os.path.join(path, f"lora_checkpoint_{i:03}")), f"lora_checkpoint_{i:03} found, should not be there"
-        assert not os.path.exists(os.path.join(path, f"optimizer_{i:03}.pt")), f"optimizer_{i:03}.pt found, should not be there"
+    for key in ["lora_checkpoint", "optimizer"]:
+        for i in range(2*E+1-models_to_keep, 2*E+1):
+            assert_checkpoint_was_saved(path, i, key)
+        for i in range(E, 2*E+1-models_to_keep): # Check that files are cleaned up
+            assert_checkpoint_was_cleanedup(path, i, key)
 
 
 def test_backward_compatibility_optimizer_state(tmp_path, capsys):
@@ -416,4 +426,7 @@ def test_lr_scheduler_with_edm(tmp_path):
             models_to_keep=1
             )
     assert trainer.global_step == E * len(dataset) // B, f"Expected global_step to be {E * len(dataset) // B}, got {trainer.global_step}"
-    
+   
+
+def test_training_with_different_ema_lengths(tmp_path):
+    assert 0 == 1

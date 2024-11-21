@@ -2,9 +2,7 @@ from score_models import ScoreModel, EDMScoreModel, MLP, NCSNpp, VPSDE, EDMv2Net
 import torch
 import pytest
 
-
 def test_edm_init(tmp_path):
-    # Some basic tests
     D = 2
     B = 10
     sde = VPSDE()
@@ -23,7 +21,7 @@ def test_edm_init(tmp_path):
     assert isinstance(new_model, EDMScoreModel)
 
 
-# TODO improve MLP with EDM framework as well, and test the new net
+# TODO improve MLP with EDM framework as well
 def test_edm_net(tmp_path):
     P = 16      # pixels
     D = [P]*2   # dimensions

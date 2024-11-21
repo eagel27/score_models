@@ -13,7 +13,7 @@ from matplotlib.colors import Normalize
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-plt.style.use('dark_background')
+# plt.style.use('dark_background')
 plt.style.use('science')
 params = {
          'figure.figsize': (4, 4),

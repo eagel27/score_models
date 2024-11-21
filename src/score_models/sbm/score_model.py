@@ -21,8 +21,12 @@ class ScoreModel(Base):
     def __new__(cls, *args, **kwargs):
         path = kwargs.get("path", None)
         if path is not None:
-            hyperparameters = load_hyperparameters(path) 
-            formulation = hyperparameters.get("formulation", "original")
+            try:
+                hyperparameters = load_hyperparameters(path) 
+                formulation = hyperparameters.get("formulation", "original")
+            except FileNotFoundError:
+                # New model created with a path
+                formulation = kwargs.get("formulation", "original")
         else:
             formulation = kwargs.get("formulation", "original")
         if formulation.lower() == "edm":

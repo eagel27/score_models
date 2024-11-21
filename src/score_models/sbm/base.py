@@ -24,6 +24,7 @@ class Base(Module, ABC):
         sde: Optional[Union[str, SDE]] = None,
         path: Optional[str] = None,
         checkpoint: Optional[int] = None,
+        ema_length: Optional[float] = None,
         device=DEVICE,
         **hyperparameters
     ):
@@ -67,9 +68,8 @@ class Base(Module, ABC):
         self.net.to(device)
         self.to(device)
         if self.path:
-            self.load(
-                checkpoint, raise_error=False
-            )  # If no checkpoint is found, loaded_checkpoint will be None
+            # If no checkpoint is found, loaded_checkpoint will be None
+            self.load(checkpoint, raise_error=False, ema_length=ema_length)
         else:
             self.loaded_checkpoint = None
 
@@ -83,8 +83,8 @@ class Base(Module, ABC):
         params = sum(p.numel() for p in self.parameters() if p.requires_grad)
         print(f"{self.net.__class__.__name__} network has {params/1e6:.2f}M parameters.")
 
-    def forward(self, t, x, *args, **kwargs) -> Tensor:
-        return self.net(t, x, *args, **kwargs)
+    @abstractmethod
+    def forward(self, t, x, *args, **kwargs) -> Tensor: ...
 
     @abstractmethod
     def loss(self, x, *args, **kwargs) -> Tensor: ...
@@ -95,7 +95,7 @@ class Base(Module, ABC):
         optimizer: Optional[torch.optim.Optimizer] = None,
         create_path: bool = True,
         step: Optional[int] = None, # Iteration number
-        sigma_rel: Optional[float] = None, # Relative EMA length scale
+        ema_length: Optional[float] = None, # Relative EMA length scale
     ):
         """
         Save the model checkpoint to the provided path or the path provided during initialization.
@@ -105,22 +105,17 @@ class Base(Module, ABC):
             optimizer (torch.optim.Optimizer, optional): Optimizer to save alongside the checkpoint. Default is None.
             create_path (bool, optional): Whether to create the path if it does not exist. Default is True.
             step (int, optional): The iteration number to save. Default is None.
-            sigma_rel (float, optional): The relative EMA length scale to save. Default is None.
+            ema_length (float, optional): The relative EMA length scale to save. Default is None.
         """
         path = path or self.path
-        if path:
-            if (
-                optimizer
-            ):  # Save optimizer first since checkpoint number is inferred from number of checkpoint files
-                save_checkpoint(
-                    model=optimizer, path=path, key="optimizer", create_path=create_path
-                )
-            save_checkpoint(model=self.net, path=path, key="checkpoint", create_path=create_path)
-            self.save_hyperparameters(path)  # If already present in path, this does nothing
-        else:
+        if path is None:
             raise ValueError(
                 "No path provided to save the model. Please provide a valid path or initialize the model with a path."
             )
+        if optimizer:  # Save optimizer first since checkpoint number is inferred from number of checkpoint files
+            save_checkpoint(model=optimizer, path=path, key="optimizer", create_path=create_path)
+        save_checkpoint(model=self.net, path=path, key="checkpoint", create_path=create_path, step=step, ema_length=ema_length)
+        self.save_hyperparameters(path)  # If already present in path, this does nothing
 
     def save_hyperparameters(self, path: Optional[str] = None):
         """
@@ -130,7 +125,12 @@ class Base(Module, ABC):
         if path:
             save_hyperparameters(self.hyperparameters, path)
 
-    def load(self, checkpoint: Optional[int] = None, raise_error: bool = True):
+    def load(
+            self, 
+            checkpoint: Optional[int] = None, 
+            ema_length: Optional[float] = None,
+            raise_error: bool = True
+            ):
         """
         Load a specific checkpoint from the model.
 
@@ -138,6 +138,7 @@ class Base(Module, ABC):
             checkpoint (int): The checkpoint number to load. If not provided, load the lastest checkpoint found.
             optimizer (torch.optim.Optimizer, optional): The optimizer to load. Default is None.
             raise_error (bool, optional): Whether to raise an error if checkpoint is not found. Default is True.
+            ema_length (float, optional): The relative EMA length scale to save. Default is None.
         """
         if self.path is None:
             raise ValueError(
@@ -148,6 +149,7 @@ class Base(Module, ABC):
             checkpoint=checkpoint,
             path=self.path,
             key="checkpoint",
+            ema_length=ema_length,
             raise_error=raise_error,
         )
 
@@ -160,14 +162,15 @@ class Base(Module, ABC):
         learning_rate_decay: Optional[int] = None,
         clip: float = 1.,
         warmup: int = 0,
-        sigma_rel: Union[float, (list, tuple)] = 0.13,
+        ema_lengths: Union[float, tuple] = 0.13,
         ema_decay: Optional[float] = None, # Traditional EMA
         update_ema_after_step: int = 100, # Parameter to delay update of traditional EMA
         update_model_with_ema_every: Optional[int] = None, # Parameter to reset the online model with EMA ala Hare and Tortoise (https://arxiv.org/abs/2406.02596)
         iterations_per_epoch: Optional[int] = None,
-        max_time: float = float("inf"),
         checkpoint_every: int = 10,
         models_to_keep: int = 1,
+        total_checkpoints_to_save: Optional[int] = None,
+        max_time: float = float("inf"),
         shuffle: bool = False,
         optimizer: Optional[torch.optim.Optimizer] = None,
         path: Optional[str] = None,
@@ -191,7 +194,7 @@ class Base(Module, ABC):
             learning_rate_decay=learning_rate_decay,
             clip=clip,
             warmup=warmup,
-            sigma_rel=sigma_rel,
+            ema_lengths=ema_lengths,
             ema_decay=ema_decay,
             update_ema_after_step=update_ema_after_step,
             update_model_with_ema_every=update_model_with_ema_every,
@@ -200,6 +203,7 @@ class Base(Module, ABC):
             optimizer=optimizer,
             checkpoint_every=checkpoint_every,
             models_to_keep=models_to_keep,
+            total_checkpoints_to_save=total_checkpoints_to_save,
             path=path,
             name_prefix=name_prefix,
             seed=seed,

@@ -1,3 +1,4 @@
+from typing import Optional, Union
 import torch
 from torch.func import grad
 from torch import vmap
