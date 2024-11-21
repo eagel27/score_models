@@ -8,6 +8,7 @@ from torch import Tensor
 from ..save_load_utils import (
     save_checkpoint,
     save_hyperparameters,
+    load_hyperparameters,
     load_checkpoint,
     load_architecture,
     load_sde,
@@ -15,6 +16,7 @@ from ..save_load_utils import (
 from ..utils import DEVICE
 from ..sde import SDE
 from ..trainer import Trainer
+from ..post_hoc_ema import PostHocEMA, ema_lengths_from_path
 
 
 class Base(Module, ABC):
@@ -29,6 +31,7 @@ class Base(Module, ABC):
         **hyperparameters
     ):
         super().__init__()
+        self.device = device
         # Backward compatibility
         if "checkpoints_directory" in hyperparameters.keys() and path is None:
             path = hyperparameters["checkpoints_directory"]
@@ -39,10 +42,14 @@ class Base(Module, ABC):
         if "model_checkpoint" in hyperparameters.keys() and checkpoint is None:
             checkpoint = hyperparameters["model_checkpoint"]
             hyperparameters.pop("model_checkpoint")
-
+        
+        # Validate inputs
+        if ema_length is not None and path is None:
+            raise ValueError("Must provide a 'path' to use PostHocEMA.")
         if net is None and path is None:
             raise ValueError("Must provide either 'net' or 'path' to instantiate the model.")
-
+        
+        # First load architecture and hyperparameters
         self.path = path
         if net is None or isinstance(net, str):
             self.net, self.hyperparameters = load_architecture(
@@ -52,7 +59,7 @@ class Base(Module, ABC):
             self.net = net
             self.hyperparameters = hyperparameters
 
-        # Important to set these attributes before any loading attempt (device is needed)
+        # Load the SDE
         if isinstance(sde, SDE):
             self.hyperparameters["sde"] = sde.__class__.__name__.lower()
             self.sde = sde
@@ -61,17 +68,15 @@ class Base(Module, ABC):
             if isinstance(sde, str):
                 self.hyperparameters["sde"] = sde
             self.sde, sde_params = load_sde(**self.hyperparameters)
-        self.hyperparameters.update(
-            sde_params
-        )  # Save the SDE hyperparameters, including the defaults
-        self.device = device
-        self.net.to(device)
-        self.to(device)
+        self.hyperparameters.update(sde_params)  
+        
+        # Load the checkpoint (or a combination of them with PostHoc EMA)
         if self.path:
-            # If no checkpoint is found, loaded_checkpoint will be None
             self.load(checkpoint, raise_error=False, ema_length=ema_length)
         else:
             self.loaded_checkpoint = None
+        self.net.to(device)
+        self.to(device)
 
         if hasattr(self.net, "hyperparameters"):
             self.hyperparameters.update(self.net.hyperparameters)
@@ -140,18 +145,31 @@ class Base(Module, ABC):
             raise_error (bool, optional): Whether to raise an error if checkpoint is not found. Default is True.
             ema_length (float, optional): The relative EMA length scale to save. Default is None.
         """
+
         if self.path is None:
             raise ValueError(
                 "A checkpoint can only be loaded if the model is instantiated with a path, e.g. model = ScoreModel(path='path/to/checkpoint')."
             )
-        self.loaded_checkpoint = load_checkpoint(
-            model=self,
-            checkpoint=checkpoint,
-            path=self.path,
-            key="checkpoint",
-            ema_length=ema_length,
-            raise_error=raise_error,
-        )
+        ema_lengths = ema_lengths_from_path(self.path)
+        if len(ema_lengths) > 1:
+            if ema_length is None:
+                raise ValueError(
+                    f"Multiple EMA lengths found in {path}. Please provide a specific ema_length to be synthesized from these checkpoints."
+                )
+            # Synthesize the model PostHoc
+            ema = PostHocEMA(self.path, device=self.device)
+            self.net = ema.synthesize_ema(ema_length)
+            self.loaded_checkpoint = None # We load a weighted average of all the checkpoints
+            print(f"Synthesized the neural network with EMA length {ema_length:.2f}.")
+        else:
+            self.loaded_checkpoint = load_checkpoint(
+                model=self,
+                checkpoint=checkpoint,
+                path=self.path,
+                key="checkpoint",
+                raise_error=raise_error,
+            )
+        self.hyperparameters.update(self.net.hyperparameters)
 
     def fit(
         self,

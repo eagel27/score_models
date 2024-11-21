@@ -120,6 +120,8 @@ class LoRAScoreModel(ScoreModel):
             ):
         if self.path is None:
             raise ValueError("A checkpoint can only be loaded if the model is instantiated with a path, e.g. model = ScoreModel(path='path/to/checkpoint').")
+        if ema_length is not None:
+            raise ValueError("LoRA models do not support EMA lengths yet.")
         # Load base SBM (and freeze it)
         base_path = os.path.join(self.path, "base_sbm")
         self.net = ScoreModel(path=base_path).net
@@ -127,7 +129,7 @@ class LoRAScoreModel(ScoreModel):
             param.requires_grad = False
         
         # Load LoRA weights
-        self.loaded_checkpoint = load_checkpoint(model=self, checkpoint=checkpoint, path=self.path, key="lora_checkpoint", ema_length=ema_length, raise_error=raise_error)
+        self.loaded_checkpoint = load_checkpoint(model=self, checkpoint=checkpoint, path=self.path, key="lora_checkpoint", raise_error=raise_error)
         print(f"Loaded LoRA weights with rank {self.hyperparameters['lora_rank']}")
         self.lora_net.print_trainable_parameters()
     

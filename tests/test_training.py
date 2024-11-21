@@ -1,5 +1,6 @@
 from torch.utils.data import TensorDataset
 from score_models import ScoreModel, EnergyModel, SLIC, HessianDiagonal, LoRAScoreModel, MLP, NCSNpp, DDPM, EDMv2Net
+from score_models import PostHocEMA
 from functools import partial
 import pytest
 import torch
@@ -57,13 +58,13 @@ class Dataset(torch.utils.data.Dataset):
                     c_idx += 1
         return [x_.squeeze(0) for x_ in x] # Remove the batch dimension for dataloader
 
-def assert_checkpoint_was_saved(path, checkpoint, key="checkpoint"):
+def assert_checkpoint_was_saved(path, checkpoint, key="checkpoint", number_expected=1):
     if key == "lora_checkpoint":
         pattern = f"{key}*_{checkpoint:03d}"
     else:
         pattern = f"{key}*_{checkpoint:03d}.pt"
     files = glob.glob(os.path.join(path, pattern))
-    assert len(files) == 1, f"Expected to find one checkpoint file, found {len(files)}"
+    assert len(files) == number_expected, f"Expected to find {number_expected} checkpoint file(s), found {len(files)}"
 
 def assert_checkpoint_was_cleanedup(path, checkpoint, key="checkpoint"):
     if key == "lora_checkpoint":
@@ -111,12 +112,19 @@ def test_training_score_model(B, conditions, sde, Net, models_to_keep, ema_decay
         B = 2
     elif isinstance(B, int):
         B = None
-    losses = model.fit(dataset, batch_size=B, epochs=E, path=path, checkpoint_every=1, models_to_keep=models_to_keep)
+    losses = model.fit(
+            dataset, 
+            batch_size=B, 
+            epochs=E, 
+            path=path, 
+            checkpoint_every=1, 
+            ema_decay=ema_decay,
+            models_to_keep=models_to_keep)
 
     print(losses)
     assert len(losses) == E, f"Expected {E} losses, got {len(losses)}"
     # Check that some improvement happens
-    assert os.path.isfile(os.path.join(path, "model_hparams.json")), "model_hparams.json not found"
+    assert os.path.isfile(os.path.join(path, "hyperparameters.json")), "hyperparameters.json not found"
     assert os.path.isfile(os.path.join(path, "script_params.json")), "script_params.json not found"
     for key in ["checkpoint", "optimizer"]:
         for i in range(E+1-models_to_keep, E+1):
@@ -169,11 +177,17 @@ def test_training_energy_model(sde, Net, tmp_path, capsys):
     model = EnergyModel(net, **sde)
     
     path = tmp_path / "test"
-    losses = model.fit(dataset, batch_size=B, epochs=E, path=path, checkpoint_every=1, models_to_keep=models_to_keep)
+    losses = model.fit(
+            dataset, 
+            batch_size=B, 
+            epochs=E, 
+            path=path, 
+            checkpoint_every=1, 
+            models_to_keep=models_to_keep)
 
     print(losses)
     assert len(losses) == E, f"Expected {E} losses, got {len(losses)}"
-    assert os.path.isfile(os.path.join(path, "model_hparams.json")), "model_hparams.json not found"
+    assert os.path.isfile(os.path.join(path, "hyperparameters.json")), "hyperparameters.json not found"
     assert os.path.isfile(os.path.join(path, "script_params.json")), "script_params.json not found"
     for key in ["checkpoint", "optimizer"]:
         for i in range(E+1-models_to_keep, E+1):
@@ -237,13 +251,19 @@ def test_training_hessian_diagonal_model(conditions, loss, sde, Net, tmp_path, c
     derivative_model = HessianDiagonal(base_model, net=derivative_net, loss=loss)
     
     path = tmp_path / "test"
-    losses = derivative_model.fit(dataset, batch_size=B, epochs=E, path=path, checkpoint_every=1, models_to_keep=models_to_keep)
+    losses = derivative_model.fit(
+            dataset, 
+            batch_size=B, 
+            epochs=E, 
+            path=path, 
+            checkpoint_every=1, 
+            models_to_keep=models_to_keep)
 
     print(losses)
     assert len(losses) == E, f"Expected {E} losses, got {len(losses)}"
     # Check that some improvement happens
     assert os.path.isdir(os.path.join(path, "score_model")), "score_model directory not found, the base SBM has not been saved"
-    assert os.path.isfile(os.path.join(path, "model_hparams.json")), "model_hparams.json not found"
+    assert os.path.isfile(os.path.join(path, "hyperparameters.json")), "hyperparameters.json not found"
     assert os.path.isfile(os.path.join(path, "script_params.json")), "script_params.json not found"
     for key in ["checkpoint", "optimizer"]:
         for i in range(E+1-models_to_keep, E+1):
@@ -312,9 +332,9 @@ def test_training_lora_model(conditions, lora_rank, sde, Net, tmp_path, capsys):
     # Check that some improvement happens
     assert os.path.isdir(os.path.join(path, "base_sbm")), "base_sbm directory not found, the base SBM has not been saved"
     print(os.listdir(os.path.join(path, "base_sbm")))
-    assert os.path.isfile(os.path.join(path, "base_sbm", "model_hparams.json")), "model_hparams.json not found in base_sbm directory"
+    assert os.path.isfile(os.path.join(path, "base_sbm", "hyperparameters.json")), "hyperparameters.json not found in base_sbm directory"
     assert os.path.isfile(os.path.join(path, "base_sbm", "checkpoint_001.pt")), "checkpout_001.pt not found in base_sbm directory"
-    assert os.path.isfile(os.path.join(path, "model_hparams.json")), "model_hparams.json not found"
+    assert os.path.isfile(os.path.join(path, "hyperparameters.json")), "hyperparameters.json not found"
     assert os.path.isfile(os.path.join(path, "script_params.json")), "script_params.json not found"
     print(os.listdir(path))
     for key in ["lora_checkpoint", "optimizer"]:
@@ -428,5 +448,57 @@ def test_lr_scheduler_with_edm(tmp_path):
     assert trainer.global_step == E * len(dataset) // B, f"Expected global_step to be {E * len(dataset) // B}, got {trainer.global_step}"
    
 
-def test_training_with_different_ema_lengths(tmp_path):
-    assert 0 == 1
+def test_training_with_different_ema_lengths_and_posthoc_ema(tmp_path):
+    E = 10
+    B = 2
+    C = 3
+    N = 4
+    D = [8, 8]
+    models_to_keep = 4    
+
+    dataset = Dataset(N, C, dimensions=D)
+    net = EDMv2Net(8, C, ch_mult=(2, 2), nf=8)
+    model = ScoreModel(net, "vp", formulation="edm")
+    
+    losses = model.fit(
+            dataset,
+            learning_rate=1e-3,
+            learning_rate_decay=10,
+            batch_size=B,
+            ema_lengths=(0.05, 0.1),
+            epochs=E,
+            path=tmp_path,
+            checkpoint_every=1,
+            models_to_keep=models_to_keep,
+            )
+
+    path = tmp_path
+    for file in os.listdir(path):
+        print(file) 
+    for i in range(E+1-models_to_keep, E+1):
+        assert_checkpoint_was_saved(path, i, key="checkpoint", number_expected=2)
+        assert_checkpoint_was_saved(path, i, key="optimizer", number_expected=1)
+    for i in range(0, E+1-models_to_keep): # Check that files are cleaned up
+        assert_checkpoint_was_cleanedup(path, i, key="checkpoint")
+        assert_checkpoint_was_cleanedup(path, i, key="optimizer")
+    
+    # Now, some under the hood check that PostHocEMA works
+    ema = PostHocEMA(path=tmp_path)
+    
+    # Make sure the zero model is created correctly
+    zero_model = ema.zero_model()
+    B = 5
+    t = torch.rand(B)
+    x = torch.randn(B, C, *D)
+    out = zero_model(t, x)
+    assert out.shape == x.shape, f"Expected output shape to be {x.shape}, got {out.shape}"
+    assert torch.all(out == 0.), f"Expected output to be all zeros, got {out}"
+    new_model = ema.synthesize_ema(0.075) # Check that model can be synthesized at a specific ema_length
+    out = new_model(t, x)
+    assert out.shape == x.shape, f"Expected output shape to be {x.shape}, got {out.shape}"
+    assert out.sum() != 0., f"Expected output to be non-zero for synthesized model, got {out}"
+    
+    # Check that the score model loads properly with ema_length
+    new_model = ScoreModel(path=tmp_path, ema_length=0.075)
+    
+    # Does it make sense to keep training from there?? Need to reset the optimizer..

@@ -17,7 +17,7 @@ def test_lora_sbm(net, sde, lora_rank, tmp_path):
     
     print(os.listdir(path))
     assert os.path.exists(path)
-    assert os.path.exists(os.path.join(path, "model_hparams.json"))
+    assert os.path.exists(os.path.join(path, "hyperparameters.json"))
     assert os.path.exists(os.path.join(path, "base_sbm"))
     assert os.path.isdir(os.path.join(path, "base_sbm"))
     for i in range(1, 4):

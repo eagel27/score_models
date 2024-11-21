@@ -22,22 +22,8 @@ from .utils import DEVICE
 def checkpoint_number(path: str) -> int:
     return int(re.findall(r'[0-9]+', path)[-1])
 
-
-def ema_length_from_path(path: str) -> float:
-    path = str(path).split("/")[-1]
-    el = [float(s[-4:]) for s in str(path).split("_") if "emalength" in s]
-    if el:
-        return el[0]
-    else:
-        return None
-
-
-def maybe_raise_error(message: str, throw_error: bool = True, error_type=FileNotFoundError):
-    if throw_error:
-        raise error_type(message)
-    else:
-        warnings.warn(message)
-
+def next_checkpoint(path: str, ema_length: Optional[float] = None) -> int:
+    return last_checkpoint(path, ema_length) + 1
 
 def last_checkpoint(path: str, ema_length: Optional[float] = None) -> int:
     if ema_length is not None:
@@ -56,10 +42,24 @@ def last_checkpoint(path: str, ema_length: Optional[float] = None) -> int:
     else:
         return 0
 
+def ema_length_from_path(path: str) -> float:
+    path = str(path).split("/")[-1]
+    el = [float(s[-4:]) for s in str(path).split("_") if "emalength" in s]
+    if el:
+        return el[0]
+    else:
+        return None
 
-def next_checkpoint(path: str, ema_length: Optional[float] = None) -> int:
-    return last_checkpoint(path, ema_length) + 1
+def step_from_path(path: str) -> int:
+    path = str(path).split("/")[-1]
+    return int([s[4:] for s in str(path).split("_") if "step" in s][0])
 
+
+def maybe_raise_error(message: str, throw_error: bool = True, error_type=FileNotFoundError):
+    if throw_error:
+        raise error_type(message)
+    else:
+        warnings.warn(message)
 
 def find_checkpoint(path: str, checkpoint: int, ema_length: Optional[float] = None) -> str:
     if ema_length is not None:
@@ -109,10 +109,10 @@ def save_checkpoint(
         else:
             raise FileNotFoundError(f"Directory {os.path.dirname(path)} does not exist")
 
-    checkpoint = next_checkpoint(path)
+    checkpoint = next_checkpoint(path, ema_length)
     prefix = f"{key}"
     if step is not None and key != "optimizer":
-        prefix += f"_step{step:03d}"
+        prefix += f"_step{step:07d}"
     if ema_length is not None and key != "optimizer":
         prefix += f"_emalength{ema_length:.2f}"
     name = f"{prefix}_{checkpoint:03d}"
@@ -123,7 +123,7 @@ def save_checkpoint(
     print(f"Saved {name} in {path}")
  
 
-def save_hyperparameters(hyperparameters: dict, path: str, key: str = "model_hparams"):
+def save_hyperparameters(hyperparameters: dict, path: str, key: str = "hyperparameters"):
     """
     Utility function to save the hyperparameters of a model to a standard file.
     """
@@ -134,11 +134,14 @@ def save_hyperparameters(hyperparameters: dict, path: str, key: str = "model_hpa
         print(f"Saved {key} to {path}")
 
 
-def load_hyperparameters(path: str, key: str = "model_hparams") -> dict:
+def load_hyperparameters(path: str, key: str = "hyperparameters") -> dict:
     """
     Utility function to load the hyperparameters of a model from a standard file.
     """
     file = os.path.join(path, f"{key}.json")
+    if not os.path.isfile(file):
+        # Backward compatibility
+        file = os.path.join(path, f"model_hparams.json")
     if os.path.isfile(file):
         with open(file, "r") as f:
             hparams = json.load(f)
@@ -156,22 +159,19 @@ def remove_oldest_checkpoint(path: str, models_to_keep: int):
         paths = sorted(glob.glob(os.path.join(path, pattern)), key=checkpoint_number)
         checkpoints = [checkpoint_number(os.path.split(path)[-1]) for path in paths]
         ema_lengths = set([ema_length_from_path(path) for path in paths]) # Remove checkpoints corresponding to different EMA lengths
-        if len(paths) > models_to_keep:
+        if len(paths) > len(ema_lengths) * models_to_keep:
             # Clean up oldest models
-            path_to_remove = paths[:len(ema_lengths)]
-            if os.path.isfile(path_to_remove):
-                os.remove(path_to_remove)
-            # Handle case (e.g. LoRA) where checkpoint is a directory
-            elif os.path.isdir(path_to_remove):
-                shutil.rmtree(path_to_remove)
+            paths_to_remove = paths[:len(ema_lengths)]
+            for path_to_remove in paths_to_remove:
+                if os.path.isfile(path_to_remove):
+                    os.remove(path_to_remove)
+                # Handle case (e.g. LoRA) where checkpoint is a directory
+                elif os.path.isdir(path_to_remove):
+                    shutil.rmtree(path_to_remove)
             # remove associated optimizer
             opt_path = os.path.join(path, "optimizer_{:03d}.pt".format(checkpoints[0]))
             if os.path.exists(opt_path):
                 os.remove(opt_path)
-            # # remove associated scalar net
-            # scalar_path = os.path.join(path, "scalar_net_{:03d}.pt".format(checkpoints[0]))
-            # if os.path.exists(scalar_path):
-                # os.remove(scalar_path)
 
 
 def load_sbm_state(sbm: "ScoreModel", path: str, device=DEVICE):
@@ -206,15 +206,22 @@ def load_lora_state(lora_sbm: "LoRAScoreModel", path: str, device=DEVICE):
 # def load_scalar_net(posterior_sbm: "LoRAPosteriorScoreModel", path: str):
     # posterior_sbm.scalar_net.load_state_dict(torch.load(path, map_location=posterior_sbm.device))
 
+def update_loss_file(path: str, checkpoint: int, step: int, loss: float, time_per_step: float):
+    # Save this logic here since we need it when loading the global step
+    with open(os.path.join(path, "loss.txt"), "a") as f:
+        f.write(f"{checkpoint} {step} {loss} {time_per_step}\n")
 
-def load_global_step(
-        path: str,
-        checkpoint: Optional[int] = None,
-        ):
-    if "step" in str(path):
-        step = [int(s[-3:]) for s in str(path).split("_") if "step" in s][-1] # -1 so we avoid some freak cases
-        return step
-    # Backward compatibility, the step was not saved before, either in loss.txt or in the filename.
+
+def load_global_step(path: str, checkpoint: int) -> int:
+    # Get the step from the loss.txt if it exists
+    file = os.path.join(path, f"loss.txt")
+    if os.path.isfile(file):
+        with open(file, "r") as f:
+            lines = f.readlines()
+        for line in reversed(lines):
+            ch, step, loss, time_per_step = line.split()
+            if int(ch) == checkpoint:
+                return int(step)
     return 0
     
         
@@ -224,7 +231,6 @@ def load_checkpoint(
         checkpoint: Optional[int] = None,
         raise_error: bool = True,
         key: Literal["checkpoint", "optimizer", "lora_checkpoint"] = "checkpoint",
-        ema_length: Optional[float] = None,
         device=DEVICE
         ):
     """
@@ -251,10 +257,7 @@ def load_checkpoint(
         else: # If no directory is found, don't do anything. This is useful for initialization of Base.
             return
     name = os.path.split(path)[-1]
-    if ema_length is not None and key != "optimizer":
-        pattern = f"*{key}*emalength{ema_length:.2f}*"
-    else:
-        pattern = f"*{key}*"
+    pattern = f"*{key}*"
     # Collect all checkpoint paths sorted by the checkpoint number (*_001.pt, *_002.pt, ...)
     paths = sorted(glob.glob(os.path.join(path, pattern)), key=checkpoint_number)
     checkpoints = [checkpoint_number(os.path.split(path)[-1]) for path in paths]
@@ -295,7 +298,6 @@ def load_architecture(
         path: Optional[str] = None,
         net: Optional[str] = None,
         device=DEVICE,
-        hparams_filename="model_hparams",
         **hyperparameters
         ) -> Tuple[Module, dict]:
     """
@@ -312,7 +314,7 @@ def load_architecture(
         if not os.path.isdir(path):
             raise FileNotFoundError(f"Directory {path} does not exist. "
                                      "Please make sure to provide a valid path to the checkpoint directory.")
-        hparams = load_hyperparameters(path, key=hparams_filename)
+        hparams = load_hyperparameters(path)
         hyperparameters.update(hparams)
         net = hyperparameters.get("model_architecture", "ncsnpp")
     

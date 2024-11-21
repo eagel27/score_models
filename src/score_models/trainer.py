@@ -17,7 +17,8 @@ from .save_load_utils import (
         remove_oldest_checkpoint, 
         last_checkpoint,
         load_checkpoint,
-        load_global_step
+        load_global_step,
+        update_loss_file
         )
 
 
@@ -82,7 +83,7 @@ class Trainer:
         # Exponential Moving Averages, with Karras prescription
         if ema_decay:
             print("It is recommended to use the Karras EMA with ema_lengths instead of the traditional EMA."
-                  " ema_lengths is set to 0.13 by default, a number between 0 and 1. Set ema_decay to None (default) to use Karras EMA.")
+                  " ema_lengths is set to 0.13 by default, a number between 0 and 0.28. Set ema_decay to None (default) to use Karras EMA.")
             # self.ema = ExponentialMovingAverage(self.model.parameters(), decay=ema_decay) # torch_ema
             self.emas = [EMA(self.model, beta=ema_decay, update_after_step=update_ema_after_step)] # ema_pytorch
             self.ema_lengths = [None]
@@ -91,7 +92,7 @@ class Trainer:
                 ema_lengths = [ema_lengths]
             for sigma_rel in ema_lengths:
                 assert sigma_rel > 0, "ema_length must be a positive float."
-                assert sigma_rel < 0.28, "ema_length must be less than 12^{-0.5}, see algorithm 2 from Karras et al. 2024."
+                assert sigma_rel < 0.28, "ema_length must be less than 0.28, see algorithm 2 from Karras et al. 2024."
             self.emas = [KarrasEMA(self.model, sigma_rel=sigma_rel) for sigma_rel in ema_lengths] # ema_pytorch
             self.ema_lengths = ema_lengths
             print(f"Using Karras EMA with ema lengths [" + ",".join([f"{sigma_rel:.2f}" for sigma_rel in ema_lengths]) + "]")
@@ -210,8 +211,7 @@ class Trainer:
                 ema.ema_model.save(self.path, optimizer=self.optimizer, ema_length=ema_length, step=self.global_step)
         
             checkpoint = last_checkpoint(self.path)
-            with open(os.path.join(self.path, "loss.txt"), "a") as f:
-                f.write(f"{checkpoint} {self.global_step} {loss} {time_per_step}\n")
+            update_loss_file(self.path, checkpoint, self.global_step, loss, time_per_step)
                 
             if self.models_to_keep:
                 remove_oldest_checkpoint(self.path, self.models_to_keep)
