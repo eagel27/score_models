@@ -22,7 +22,7 @@ def ema_lengths_from_path(path: str):
 def ema_length_to_gamma(sigma_rel):
     """ sigma_rel and ema_length are the same thing """
     t = sigma_rel ** (-2)
-    gamma = np.roots([1, 7, 16 -t, 12 -t]). real.max()
+    gamma = np.roots([1, 7, 16 - t, 12 - t]). real.max()
     return gamma
 
 # Algorithm 3 from Karras el al. 2024
@@ -54,6 +54,7 @@ class PostHocEMA:
             p.zero_()
     
     def validate_checkpoints(self):
+        # Is it necessary? Feels like we could synthesize models even with a single ema_length. Not guarantee to obtain a good model but still
         if len(self.ema_lengths) < 2:
             raise ValueError("At least 2 EMA lengths are required to synthesize a new model")
         paths = {}
@@ -91,7 +92,7 @@ class PostHocEMA:
         weights = solve_weights(steps, gammas, target_step, target_gamma)
         return weights
     
-    def synthesize_ema(self, ema_length: float, model_requires_grad: bool = False):
+    def synthesize_ema(self, ema_length: float, model_requires_grad: bool = True):
         pattern = "*checkpoint*.pt"
         paths = glob.glob(os.path.join(self.path, pattern))
         weights = self.weights(paths, ema_length)

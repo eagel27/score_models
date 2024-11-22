@@ -33,6 +33,7 @@ class Base(Module, ABC):
         super().__init__()
         self.device = device
         # Backward compatibility
+        self.reload_optimizer = True
         if "checkpoints_directory" in hyperparameters.keys() and path is None:
             path = hyperparameters["checkpoints_directory"]
             hyperparameters.pop("checkpoints_directory")
@@ -154,12 +155,13 @@ class Base(Module, ABC):
         if len(ema_lengths) > 1:
             if ema_length is None:
                 raise ValueError(
-                    f"Multiple EMA lengths found in {path}. Please provide a specific ema_length to be synthesized from these checkpoints."
+                    f"Multiple EMA lengths found in {self.path}. Please provide a specific ema_length to be synthesized from these checkpoints."
                 )
             # Synthesize the model PostHoc
             ema = PostHocEMA(self.path, device=self.device)
             self.net = ema.synthesize_ema(ema_length)
             self.loaded_checkpoint = None # We load a weighted average of all the checkpoints
+            self.reload_optimizer = False # If we fit the model again, we don't want to reload the optimizer, since model has changed 
             print(f"Synthesized the neural network with EMA length {ema_length:.2f}.")
         else:
             self.loaded_checkpoint = load_checkpoint(
@@ -169,6 +171,7 @@ class Base(Module, ABC):
                 key="checkpoint",
                 raise_error=raise_error,
             )
+            self.reload_optimizer = True
         self.hyperparameters.update(self.net.hyperparameters)
 
     def fit(
@@ -194,6 +197,7 @@ class Base(Module, ABC):
         path: Optional[str] = None,
         name_prefix: Optional[str] = None,
         seed: Optional[int] = None,
+        reload_optimizer: bool = True,
         **kwargs
     ) -> list:
         # Backward compatibility
@@ -226,6 +230,7 @@ class Base(Module, ABC):
             name_prefix=name_prefix,
             seed=seed,
             shuffle=shuffle,
+            reload_optimizer=self.reload_optimizer and reload_optimizer,
         )
         losses = trainer.train()
         return losses

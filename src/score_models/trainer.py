@@ -47,7 +47,7 @@ class Trainer:
         ema_lengths: Union[float, tuple] = 0.13, # Karras EMA
         ema_decay: Optional[float] = None, # Traditional EMA
         update_ema_after_step: int = 100, # Parameter to delay update of traditional EMA
-        update_model_with_ema_every: Optional[int] = None, # Parameter to reset the online model with EMA ala Hare and Tortoise (https://arxiv.org/abs/2406.02596)
+        update_model_with_ema_every: Optional[int] = None, # Parameter to reset the online model (and optimizer) with EMA ala Hare and Tortoise 
         clip: float = 1.,
         warmup: int = 0,
         shuffle: bool = False,
@@ -60,6 +60,7 @@ class Trainer:
         name_prefix: Optional[str] = None,
         seed: Optional[int] = None,
         optimizer: Optional[torch.optim.Optimizer] = None,
+        reload_optimizer: bool = True,
         ): 
         # Model
         self.model = model
@@ -77,8 +78,21 @@ class Trainer:
         
         # Optimizer
         self.lr = learning_rate
-        self.optimizer = optimizer or torch.optim.Adam(self.model.parameters(), lr=learning_rate)
         self.iterations_per_epoch = iterations_per_epoch or len(self.dataloader)
+        self.optimizer = optimizer or torch.optim.Adam(self.model.parameters(), lr=learning_rate)
+        if update_model_with_ema_every is not None:
+            raise NotImplementedError("update_model_with_ema_every is not implemented yet.")
+
+        # Learning rate schedule
+        self.global_step = 0
+        if learning_rate_decay:
+            assert learning_rate_decay > 0, "learning_rate_decay must be a positive integer."
+        self.lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+            optimizer=self.optimizer,
+            # Use self.global_step, so that we can reload training from a checkpoint and have the correct learning rate
+            lr_lambda=lambda step: 
+                warmup_schedule(self.global_step, warmup) * inverse_sqrt_schedule(self.global_step, learning_rate_decay, warmup)
+        )
         
         # Exponential Moving Averages, with Karras prescription
         if ema_decay:
@@ -97,16 +111,6 @@ class Trainer:
             self.ema_lengths = ema_lengths
             print(f"Using Karras EMA with ema lengths [" + ",".join([f"{sigma_rel:.2f}" for sigma_rel in ema_lengths]) + "]")
         
-        # Learning rate schedule
-        self.global_step = 0
-        if learning_rate_decay:
-            assert learning_rate_decay > 0, "learning_rate_decay must be a positive integer."
-        self.lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
-            optimizer=self.optimizer,
-            # Use self.global_step, so that we can reload training from a checkpoint and have the correct learning rate
-            lr_lambda=lambda step: 
-                warmup_schedule(self.global_step, warmup) * inverse_sqrt_schedule(self.global_step, learning_rate_decay, warmup)
-        )
         if seed:
             torch.manual_seed(seed)
             
@@ -128,13 +132,15 @@ class Trainer:
             if not os.path.isdir(self.model.path): # Double check the path is valid
                 print(f"Provided path {self.model.path} is not a valid directory. Can't load checkpoint.")
             else:
-                checkpoint = load_checkpoint(
-                        model=self.optimizer, 
-                        checkpoint=self.model.loaded_checkpoint, 
-                        path=self.model.path, 
-                        key="optimizer",
-                        device=self.model.device
-                        )
+                if reload_optimizer:
+                    checkpoint = load_checkpoint(
+                            model=self.optimizer, 
+                            checkpoint=self.model.loaded_checkpoint, 
+                            path=self.model.path, 
+                            key="optimizer",
+                            device=self.model.device,
+                            raise_error=False
+                            )
                 # Resume global step
                 self.global_step = load_global_step(self.model.path, self.model.loaded_checkpoint)
                 print(f"Resumed training from checkpoint {checkpoint}.")
@@ -196,6 +202,14 @@ class Trainer:
         else:
             self.path = None
             print("No path provided. Training checkpoints will not be saved.")
+    
+    def reinitialize_optimizer(self):
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
+        self.lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+            optimizer=self.optimizer,
+            lr_lambda=lambda step: 
+                warmup_schedule(self.global_step, self.warmup) * inverse_sqrt_schedule(self.global_step, self.learning_rate_decay, self.warmup)
+        )
 
     def save_checkpoint(self, loss: float, time_per_step):
         """

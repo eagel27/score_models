@@ -501,4 +501,7 @@ def test_training_with_different_ema_lengths_and_posthoc_ema(tmp_path):
     # Check that the score model loads properly with ema_length
     new_model = ScoreModel(path=tmp_path, ema_length=0.075)
     
+    with pytest.raises(ValueError):
+        new_model = ScoreModel(path=tmp_path) # Need to provide ema_length in that context, where more than one were used 
+    
     # Does it make sense to keep training from there?? Need to reset the optimizer..
