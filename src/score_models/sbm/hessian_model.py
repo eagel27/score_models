@@ -58,7 +58,7 @@ class HessianDiagonal(Base):
     def score(self, t: Tensor, x: Tensor, *args, **kwargs) -> Tensor:
         return self.score_model.score(t, x, *args, **kwargs)
     
-    def loss(self, x: Tensor, *args, step: int) -> Tensor:
+    def loss(self, x: Tensor, *args) -> Tensor:
         return self._loss(self, x, *args)
     
     def reparametrized_diagonal(self, t: Tensor, x: Tensor, *args, **kwargs) -> Tensor:

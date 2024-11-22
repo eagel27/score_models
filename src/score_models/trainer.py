@@ -7,11 +7,11 @@ import json, os
 import time
 import numpy as np
 from torch.utils.data import DataLoader, Dataset
-# from torch_ema import ExponentialMovingAverage
-from ema_pytorch import EMA, KarrasEMA
 from datetime import datetime
 from tqdm import tqdm
 
+
+from .ema import EMA
 from .utils import DEVICE
 from .save_load_utils import (
         remove_oldest_checkpoint, 
@@ -43,11 +43,12 @@ class Trainer:
         epochs: int = 100,
         batch_size: Optional[int] = None,
         learning_rate: float = 1e-3,
-        learning_rate_decay: Optional[int] = None, # Number of epochs before decaying learning rate with a square root decay schedule
-        ema_lengths: Union[float, tuple] = 0.13, # Karras EMA
-        ema_decay: Optional[float] = None, # Traditional EMA
-        update_ema_after_step: int = 100, # Parameter to delay update of traditional EMA
-        update_model_with_ema_every: Optional[int] = None, # Parameter to reset the online model (and optimizer) with EMA ala Hare and Tortoise 
+        learning_rate_decay: Optional[int] = None, # Number of steps to decay the learning rate
+        ema_decay: Optional[float] = None,         # Traditional EMA
+        ema_lengths: Union[float, tuple] = 0.13,   # Karras EMA
+        start_ema_after_step: int = 100,           # Parameter to delay update of traditional EMA
+        soft_reset_every: Optional[int] = None,    # Number of epochs before resetting the online model (and optimizer) to EMA model (ala Hare and Tortoise)
+        update_ema_every: int = 1,                 # Update for the EMA
         clip: float = 1.,
         warmup: int = 0,
         shuffle: bool = False,
@@ -80,8 +81,6 @@ class Trainer:
         self.lr = learning_rate
         self.iterations_per_epoch = iterations_per_epoch or len(self.dataloader)
         self.optimizer = optimizer or torch.optim.Adam(self.model.parameters(), lr=learning_rate)
-        if update_model_with_ema_every is not None:
-            raise NotImplementedError("update_model_with_ema_every is not implemented yet.")
 
         # Learning rate schedule
         self.global_step = 0
@@ -94,22 +93,26 @@ class Trainer:
                 warmup_schedule(self.global_step, warmup) * inverse_sqrt_schedule(self.global_step, learning_rate_decay, warmup)
         )
         
-        # Exponential Moving Averages, with Karras prescription
-        if ema_decay:
-            print("It is recommended to use the Karras EMA with ema_lengths instead of the traditional EMA."
-                  " ema_lengths is set to 0.13 by default, a number between 0 and 0.28. Set ema_decay to None (default) to use Karras EMA.")
-            # self.ema = ExponentialMovingAverage(self.model.parameters(), decay=ema_decay) # torch_ema
-            self.emas = [EMA(self.model, beta=ema_decay, update_after_step=update_ema_after_step)] # ema_pytorch
-            self.ema_lengths = [None]
-        else:
+        # Exponential Moving Averages
+        self.soft_reset_every = soft_reset_every
+        if ema_lengths:
             if not isinstance(ema_lengths, (list, tuple)):
                 ema_lengths = [ema_lengths]
+            ema_lengths = sorted(ema_lengths)
             for sigma_rel in ema_lengths:
                 assert sigma_rel > 0, "ema_length must be a positive float."
                 assert sigma_rel < 0.28, "ema_length must be less than 0.28, see algorithm 2 from Karras et al. 2024."
-            self.emas = [KarrasEMA(self.model, sigma_rel=sigma_rel) for sigma_rel in ema_lengths] # ema_pytorch
+            self.emas = [EMA(model=self.model, sigma_rel=ema_length, update_every=update_ema_every) for ema_length in ema_lengths]
             self.ema_lengths = ema_lengths
             print(f"Using Karras EMA with ema lengths [" + ",".join([f"{sigma_rel:.2f}" for sigma_rel in ema_lengths]) + "]")
+        elif ema_decay:
+            self.emas = [EMA(self.model, beta=ema_decay, start_update_after_step=update_ema_after_step, update_every=update_ema_every)]
+            self.ema_lengths = [None]
+            print(f"Using traditional EMA with decay {ema_decay}")
+        else:
+            raise ValueError("Either ema_decay or ema_lengths must be provided.")
+        if soft_reset_every:
+            print(f"Trainer will soft reset every {soft_reset_every} epochs using the EMA model with ema length {ema_lengths[-1]:.2f}.")
         
         if seed:
             torch.manual_seed(seed)
@@ -201,6 +204,8 @@ class Trainer:
             self.path = self.model.path
         else:
             self.path = None
+            if len(ema_lengths) > 1:
+                raise ValueError("When training with more than one EMA length, a path must be provided to save the checkpoints and allow PostHocEMA.")
             print("No path provided. Training checkpoints will not be saved.")
     
     def reinitialize_optimizer(self):
@@ -217,10 +222,6 @@ class Trainer:
         when the number of checkpoints exceeds models_to_keep.
         """
         if self.path:
-            ## torch_ema
-            # with self.ema.average_parameters():
-                # self.model.save(self.path, optimizer=self.optimizer)
-            ## ema_pytorch
             for ema_length, ema in zip(self.ema_lengths, self.emas):
                 ema.ema_model.save(self.path, optimizer=self.optimizer, ema_length=ema_length, step=self.global_step)
         
@@ -248,7 +249,7 @@ class Trainer:
                 args = []
             # Training step
             self.optimizer.zero_grad()
-            loss = self.model.loss(x, *args, step=self.global_step)
+            loss = self.model.loss(x, *args)
             loss.backward()
             if self.clip > 0:
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.clip)
@@ -275,6 +276,12 @@ class Trainer:
             # Train
             epoch_start = time.time()
             cost, time_per_step_avg = self.train_epoch()
+            
+            # Soft Rest (ala Hare and Tortoise)
+            if self.soft_reset_every and (epoch + 1) % self.soft_reset_every == 0:
+                self.reinitialize_optimizer()
+                self.emas[-1].soft_reset() # Use the longer average for the soft reset
+
             # Logging
             losses.append(cost)
             pbar.set_description(f"Epoch {epoch + 1:d} | Cost: {cost:.1e} |")
@@ -297,7 +304,5 @@ class Trainer:
                 estimated_time_for_epoch = time.time() - epoch_start
 
         print(f"Finished training after {(time.time() - global_start) / 3600:.3f} hours.")
-        # Save EMA weights in the model for dynamic use (e.g. Jupyter notebooks)
-        # self.ema.copy_to(self.model.parameters()) ## torch_ema
-        self.emas[0].copy_params_from_ema_to_model() ## ema_pytorch
+        self.emas[-1].soft_reset() # Return the EMA model
         return losses

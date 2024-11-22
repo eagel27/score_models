@@ -24,35 +24,18 @@ class EDMScoreModel(ScoreModel):
         path: Optional[str] = None,
         checkpoint: Optional[int] = None,
         # hessian_diagonal_model: Optional["HessianDiagonal"] = None,
-        sample_noise_level_function: Optional[Callable] = None,
-        noise_level_distribution: Literal["uniform", "normal"] = "uniform",
-        log_sigma_mean: float = -1.2,
-        log_sigma_std: float = 1.2,
         device=DEVICE,
         **hyperparameters
     ):
         # Hessian Diagonal model is not supported for EDM models
         super().__init__(net, sde, path, checkpoint=checkpoint, device=device, **hyperparameters)
-        # Make sure to save in hyperparameters the formulation
         self.hyperparameters["formulation"] = "edm"
 
-        if sample_noise_level_function is None:
-            if noise_level_distribution == "uniform":
-                print("Samplng distribution is Uniform in [epsilon, T]")
-                self.sample_noise_level = self._uniform_noise_level_distribution
-            elif noise_level_distribution == "normal":
-                print(f"Sampling distribution is log-Normal for sigma with mean {log_sigma_mean} and standard deviation {log_sigma_std}")
-                self.log_sigma_mean = log_sigma_mean
-                self.log_sigma_std = log_sigma_std
-                self.sample_noise_level = self._normal_noise_level_distribution
-            else:
-                raise ValueError(f"Sampling distribution {noise_level_distribution} is not recognized. Choose between 'uniform' and 'normal'.")
-        else:
-            print(f"Using custom noise level sampling function {sample_noise_level_function.__name__}") 
-            self.sample_noise_level = sample_noise_level_function
-
-    def loss(self, x, *args, step: int) -> Tensor:
+    def loss(self, x, *args) -> Tensor:
         return edm_dsm(self, x, *args)
+    
+    def sample_noise_level(self, B: int) -> Tensor:
+        return self._uniform_noise_level_distribution(B)
 
     def reparametrized_score(self, t, x, *args, **kwargs) -> Tensor:
         """
@@ -102,4 +85,33 @@ class EDMScoreModel(ScoreModel):
 
     def forward(self, t, x, *args, **kwargs):
         return self.score(t, x, *args, **kwargs)
+    
+    def fit(
+            self,
+            *args,
+            sample_noise_level_function: Optional[Callable] = None,
+            noise_level_distribution: Literal["uniform", "normal"] = "uniform",
+            log_sigma_mean: float = -1.2,
+            log_sigma_std: float = 1.2,
+            adaptive_loss_weights: bool = False,
+            **kwargs
+            ):
+        if sample_noise_level_function is None:
+            if noise_level_distribution == "uniform":
+                print("Samplng noise level from a Uniform in [epsilon, T]")
+                self.sample_noise_level = self._uniform_noise_level_distribution
+            elif noise_level_distribution == "normal":
+                print(f"Sampling noise level from log-Normal with mean log sigma = {log_sigma_mean} and standard deviation {log_sigma_std}")
+                self.log_sigma_mean = log_sigma_mean
+                self.log_sigma_std = log_sigma_std
+                self.sample_noise_level = self._normal_noise_level_distribution
+            else:
+                raise ValueError(f"Sampling distribution {noise_level_distribution} is not recognized. Choose between 'uniform' and 'normal'.")
+        else:
+            print(f"Using custom function {sample_noise_level_function.__name__} to sample nosie level ") 
+            self.sample_noise_level = sample_noise_level_function
+        
+        if adaptive_loss_weights:
+            raise NotImplementedError("Adaptive loss weights are not supported for EDM models.")
+        return super().fit(*args, **kwargs)
 

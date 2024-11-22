@@ -11,6 +11,7 @@ from .save_load_utils import (
         ema_length_from_path,
         step_from_path,
         )
+from .ema import ema_length_to_gamma
 
 __all__ = ["PostHocEMA"]
 
@@ -18,15 +19,10 @@ def ema_lengths_from_path(path: str):
     checkpoint_paths = glob.glob(os.path.join(path, "*checkpoint*.pt"))
     return sorted(list(set([ema_length_from_path(path) for path in checkpoint_paths])))
 
-# Algorithm 2 from Karras el al. 2024
-def ema_length_to_gamma(sigma_rel):
-    """ sigma_rel and ema_length are the same thing """
-    t = sigma_rel ** (-2)
-    gamma = np.roots([1, 7, 16 - t, 12 - t]). real.max()
-    return gamma
-
-# Algorithm 3 from Karras el al. 2024
 def p_dot_p(t_a, gamma_a, t_b, gamma_b):
+    """
+    Algorithm 3 from Karras et al. 2024
+    """
     t_ratio = t_a / t_b
     t_exp = np.where(t_a < t_b, gamma_b, -gamma_a)
     t_max = np.maximum(t_a, t_b)
@@ -35,6 +31,9 @@ def p_dot_p(t_a, gamma_a, t_b, gamma_b):
     return num / den
 
 def solve_weights(t_i, gamma_i, t_r, gamma_r):
+    """
+    Algorithm 3 from Karras et al. 2024
+    """
     rv = lambda x: np.float64(x).reshape(-1, 1)
     cv = lambda x: np.float64(x).reshape(1, -1)
     A = p_dot_p(rv(t_i), rv(gamma_i), cv(t_i), cv(gamma_i ))
@@ -54,7 +53,6 @@ class PostHocEMA:
             p.zero_()
     
     def validate_checkpoints(self):
-        # Is it necessary? Feels like we could synthesize models even with a single ema_length. Not guarantee to obtain a good model but still
         if len(self.ema_lengths) < 2:
             raise ValueError("At least 2 EMA lengths are required to synthesize a new model")
         paths = {}
@@ -75,7 +73,8 @@ class PostHocEMA:
             p.zero_()
         return model
     
-    def weights(self, paths, ema_length: float):
+    def checkpoint_weights(self, paths, ema_length: float):
+        # TODO Maybe implement some logic to choose the target step and discard checkpoints saved later
         if ema_length < 0 or ema_length > self.ema_lengths[-1]:
             raise ValueError(f"EMA length {ema_length} is out of bounds, should be in [{self.ema_lengths[0]}, {self.ema_lengths[-1]}]")
 
@@ -87,7 +86,7 @@ class PostHocEMA:
         steps = torch.tensor([step_from_path(path) for path in paths], device=self.device)
         # Target gamma and step (last step)
         target_gamma = torch.tensor(ema_length_to_gamma(ema_length), device=self.device)
-        target_step = steps.max()
+        target_step = steps.max() 
         # Compute the dot product and solve for the weights
         weights = solve_weights(steps, gammas, target_step, target_gamma)
         return weights
@@ -95,7 +94,7 @@ class PostHocEMA:
     def synthesize_ema(self, ema_length: float, model_requires_grad: bool = True):
         pattern = "*checkpoint*.pt"
         paths = glob.glob(os.path.join(self.path, pattern))
-        weights = self.weights(paths, ema_length)
+        weights = self.checkpoint_weights(paths, ema_length)
         
         online_model = self.zero_model()
 

@@ -86,6 +86,7 @@ class Base(Module, ABC):
         if "model_architecture" not in self.hyperparameters:
             self.hyperparameters["model_architecture"] = self.net.__class__.__name__.lower()
         self.model = self.net
+        # Print number of parameters
         params = sum(p.numel() for p in self.parameters() if p.requires_grad)
         print(f"{self.net.__class__.__name__} network has {params/1e6:.2f}M parameters.")
 
@@ -118,10 +119,10 @@ class Base(Module, ABC):
             raise ValueError(
                 "No path provided to save the model. Please provide a valid path or initialize the model with a path."
             )
-        if optimizer:  # Save optimizer first since checkpoint number is inferred from number of checkpoint files
+        if optimizer:
             save_checkpoint(model=optimizer, path=path, key="optimizer", create_path=create_path)
         save_checkpoint(model=self.net, path=path, key="checkpoint", create_path=create_path, step=step, ema_length=ema_length)
-        self.save_hyperparameters(path)  # If already present in path, this does nothing
+        self.save_hyperparameters(path)
 
     def save_hyperparameters(self, path: Optional[str] = None):
         """
@@ -179,17 +180,18 @@ class Base(Module, ABC):
         dataset: torch.utils.data.Dataset,
         epochs: int = 1,
         batch_size: Optional[int] = None,
-        learning_rate: float = 1e-4,
-        learning_rate_decay: Optional[int] = None,
-        clip: float = 1.,
-        warmup: int = 0,
-        ema_lengths: Union[float, tuple] = 0.13,
-        ema_decay: Optional[float] = None, # Traditional EMA
-        update_ema_after_step: int = 100, # Parameter to delay update of traditional EMA
-        update_model_with_ema_every: Optional[int] = None, # Parameter to reset the online model with EMA ala Hare and Tortoise (https://arxiv.org/abs/2406.02596)
-        iterations_per_epoch: Optional[int] = None,
-        checkpoint_every: int = 10,
-        models_to_keep: int = 1,
+        learning_rate: float = 1e-3,
+        learning_rate_decay: Optional[int] = None, # Number of steps to decay the learning rate
+        clip: float = 1.,                       # Gradient clipping
+        warmup: int = 0,                        # Number of steps before reaching the target learning rate (good to let Adam warm up)
+        ema_decay: Optional[float] = None,      # Traditional EMA
+        ema_lengths: Optional[Union[float, tuple]] = 0.13, # Karras EMA 
+        start_ema_after_step: int = 100,        # Delay update of traditional EMA by this number of steps
+        soft_reset_every: Optional[int] = None, # Number of epochs before resetting the online model (and optimizer) to EMA model (ala Hare and Tortoise)
+        update_ema_every: int = 1,              # How often to update the EMA model (steps)
+        iterations_per_epoch: Optional[int] = None, # Number of iterations per epoch, can be defined independently of the number of items in the dataset
+        checkpoint_every: int = 10,             # Save a checkpoint every this number of epochs
+        models_to_keep: int = 1,                # Number of models to keep (the rest will be deleted)
         total_checkpoints_to_save: Optional[int] = None,
         max_time: float = float("inf"),
         shuffle: bool = False,
@@ -218,8 +220,9 @@ class Base(Module, ABC):
             warmup=warmup,
             ema_lengths=ema_lengths,
             ema_decay=ema_decay,
-            update_ema_after_step=update_ema_after_step,
-            update_model_with_ema_every=update_model_with_ema_every,
+            start_ema_after_step=start_ema_after_step,
+            soft_reset_every=soft_reset_every,
+            update_ema_every=update_ema_every,
             iterations_per_epoch=iterations_per_epoch,
             max_time=max_time,
             optimizer=optimizer,

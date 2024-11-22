@@ -51,7 +51,7 @@ class ScoreModel(Base):
         else:
             self.dlogp = None
 
-    def loss(self, x, *args, step: int) -> Tensor:
+    def loss(self, x, *args) -> Tensor:
         return dsm(self, x, *args)
 
     def reparametrized_score(self, t, x, *args, **kwargs) -> Tensor:
