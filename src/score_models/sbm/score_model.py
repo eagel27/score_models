@@ -25,7 +25,7 @@ class ScoreModel(Base):
                 hyperparameters = load_hyperparameters(path) 
                 formulation = hyperparameters.get("formulation", "original")
             except FileNotFoundError:
-                # New model created with a path
+                # Freak case where a new model is created from scratch with a path (so no hyperparameters is present)
                 formulation = kwargs.get("formulation", "original")
         else:
             formulation = kwargs.get("formulation", "original")

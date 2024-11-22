@@ -92,6 +92,8 @@ class Trainer:
             lr_lambda=lambda step: 
                 warmup_schedule(self.global_step, warmup) * inverse_sqrt_schedule(self.global_step, learning_rate_decay, warmup)
         )
+        self.warmup = warmup
+        self.learning_rate_decay = learning_rate_decay
         
         # Exponential Moving Averages
         self.soft_reset_every = soft_reset_every

@@ -75,6 +75,7 @@ def assert_checkpoint_was_cleanedup(path, checkpoint, key="checkpoint"):
     assert len(files) == 0, f"Expected to find no checkpoint files, found {len(files)}"
 
 
+@pytest.mark.parametrize("soft_reset_every", [None, 1])
 @pytest.mark.parametrize("ema_decay", [None, 0.999])
 @pytest.mark.parametrize("models_to_keep", [1, 2])
 @pytest.mark.parametrize("conditions", [
@@ -88,7 +89,7 @@ def assert_checkpoint_was_cleanedup(path, checkpoint, key="checkpoint"):
     ])
 @pytest.mark.parametrize("Net", [MLP, NCSNpp, DDPM])
 @pytest.mark.parametrize("B", [None, 2]) # Make sure we don't create a dataloader if batch_size is None
-def test_training_score_model(B, conditions, sde, Net, models_to_keep, ema_decay, tmp_path, capsys):
+def test_training_score_model(B, conditions, sde, Net, models_to_keep, ema_decay, soft_reset_every, tmp_path, capsys):
     condition_type, embeddings, channels = conditions
     hp = { # Hyperparameters for the dataset
             "ch_mult": (1, 1),
@@ -119,6 +120,7 @@ def test_training_score_model(B, conditions, sde, Net, models_to_keep, ema_decay
             path=path, 
             checkpoint_every=1, 
             ema_decay=ema_decay,
+            soft_reset_every=soft_reset_every,
             models_to_keep=models_to_keep)
 
     print(losses)
