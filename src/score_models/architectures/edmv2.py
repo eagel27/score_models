@@ -240,13 +240,27 @@ class UNet(torch.nn.Module):
             **block_kwargs,                           # Arguments for Block.
     ):
         super().__init__()
+            self,
+            in_channels: int,                               # Number of input channels.
+            out_channels: int,                              # Number of output channels.
+            emb_channels: int,                              # Number of embedding channels.
+            flavor: Literal["enc", "dec"]                = 'enc',    # Flavor: 'enc' or 'dec'.
+            resample_mode: Literal["keep", "up", "down"] = 'keep',   # Resampling: 'keep', 'up', or 'down'.
+            resample_filter: List[int]                   = [1,1],    # Resampling filter.
+            attention: bool                              = False,    # Include self-attention?
+            channels_per_head: int                       = 64,       # Number of channels per attention head.
+            dropout: float                               = 0,        # Dropout probability.
+            res_balance: float                           = 0.3,      # Balance between main branch (0) and residual branch (1).
+            attn_balance: float                          = 0.3,      # Balance between main branch (0) and self-attention (1).
+            clip_act: Optional[float]                    = None,     # Clip output activations. None = do not clip. (Karras et al. 2023 used clip_act=256)
+            **kwargs, 
         default_block_kwargs = { # Global hyperparameter, we skip the layer specific ones
-                "resample_filter": [1,1],
-                "channels_per_head": 64,
-                "dropout": 0,
-                "res_balance": 0.3,
-                "attn_balance": 0.3,
-                "clip_act": None,
+                "resample_filter": Block.__init__.__defaults__[2],
+                "channels_per_head": Block.__init__.__defaults__[4],
+                "dropout": Block.__init__.__defaults__[5],
+                "res_balance": Block.__init__.__defaults__[6],
+                "attn_balance": Block.__init__.__defaults__[7],
+                "clip_act": Block.__init__.__defaults__[8],
                 }
         default_block_kwargs.update(block_kwargs)
         self.hyperparameters = {
