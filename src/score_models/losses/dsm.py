@@ -8,7 +8,7 @@ import torch
 
 __all__ = [
         "dsm",
-        "edm_dsm",
+        "karras_dsm",
         "denoising_score_matching", 
         "second_order_dsm", 
         "second_order_dsm_meng_variation",
@@ -35,7 +35,7 @@ def dsm(model: "ScoreModel", x: Tensor, *args: list[Tensor], **kwargs):
     epsilon_theta = model.reparametrized_score(t, xt, *args)                       # epsilon_theta(t, x) = sigma(t) * score(t, x)
     return ((epsilon_theta + z)**2).sum() / (2 * B)
 
-def edm_dsm(model: "ScoreModel", x: Tensor, *args: list[Tensor], **kwargs):
+def karras_dsm(model: "ScoreModel", x: Tensor, *args: list[Tensor], adaptive_weigts: bool = False, **kwargs):
     """
     Desnoing Score Matching loss used by Tero Karras in his EDM formulation. 
     The idea is to use the Tweedie formula to train the score, and define 
@@ -57,11 +57,17 @@ def edm_dsm(model: "ScoreModel", x: Tensor, *args: list[Tensor], **kwargs):
     xt = mu * x + sigma * z                                                        # xt ~ p(xt | x0)
     
     # EDM Denoising loss, with weight factor taken into account
-    F_theta = model.reparametrized_score(t, xt, *args)
+    if adaptive_weigts:
+        F_theta, u = model.reparametrized_score(t, xt, *args, return_logvar=True)
+        u = u.view(-1, *[1]*len(D))
+    else:
+        F_theta = model.reparametrized_score(t, xt, *args)
+        u = torch.zeros_like(t).view(-1, *[1]*len(D))
     c_out = model.sde.c_out(t).view(B, *[1]*len(D))
     c_skip = model.sde.c_skip(t).view(B, *[1]*len(D))
     effective_score = (x - c_skip * xt) / c_out
-    return ((F_theta - effective_score)**2).sum() / (2 * B)
+    loss = (F_theta - effective_score)**2
+    return (torch.exp(u) * loss + u).sum() / (2 * B)
 
 def denoising_score_matching(
         model: "ScoreModel", 

@@ -336,6 +336,7 @@ class EDMv2Net(torch.nn.Module):
             **unet_kwargs,
         }
 
+    # kwargs need to be return_logvar, assumed to be the case in dsm.py
     def forward(self, t, x, *args, return_logvar=False, **kwargs):
         B, *D = x.shape
         out = self.unet(t, x, *args, **kwargs)

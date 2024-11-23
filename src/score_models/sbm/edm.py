@@ -2,11 +2,12 @@ from typing import Union, Optional, Literal, Callable, TYPE_CHECKING
 
 from torch import Tensor
 from torch.nn import Module
+from functools import lru_cache
 import torch
 
 from .score_model import ScoreModel
 from ..sde import SDE
-from ..losses import edm_dsm
+from ..losses import karras_dsm
 from ..solver import Solver, ODESolver
 from ..utils import DEVICE
 if TYPE_CHECKING:
@@ -14,6 +15,13 @@ if TYPE_CHECKING:
 
 
 __all__ = ["EDMScoreModel"]
+
+
+@lru_cache
+def check_that_net_can_return_logvar(net_class_name, raise_error=True) -> bool:
+    if not net_class_name in ["MLPv2", "EDMv2Net"]:
+        if raise_error:
+            raise ValueError(f"Model {net_class_name} does not support return_logvar=True.")
 
 
 class EDMScoreModel(ScoreModel):
@@ -32,20 +40,23 @@ class EDMScoreModel(ScoreModel):
         self.hyperparameters["formulation"] = "edm"
 
     def loss(self, x, *args) -> Tensor:
-        return edm_dsm(self, x, *args)
+        if hasattr(self, "adaptive_weights"):
+            return karras_dsm(self, x, *args, adaptive_weights=self.adaptive_weights)
+        else:
+            return karras_dsm(self, x, *args)
     
     def sample_noise_level(self, B: int) -> Tensor:
         return self._uniform_noise_level_distribution(B)
 
-    def reparametrized_score(self, t, x, *args, **kwargs) -> Tensor:
+    def reparametrized_score(self, t, x, *args, return_logvar=False, **kwargs) -> Tensor:
         """
         In this formulation, reparametrized score is F_theta(t, x)
         """
         B, *D = x.shape
         c_in = self.sde.c_in(t).view(B, *[1]*len(D))
-        return self.net(t, c_in * x, *args, **kwargs)
+        return self.net(t, c_in * x, *args, return_logvar=return_logvar, **kwargs)
     
-    def score(self, t, x, *args, **kwargs) -> Tensor:
+    def score(self, t, x, *args, return_logvar=False, **kwargs) -> Tensor:
         """
         Score function is defined through Tweedie's formula and the preconditioned denoiser. 
         For the VP, we use the edm_scale function, one can look at equation 186 in 
@@ -53,17 +64,27 @@ class EDMScoreModel(ScoreModel):
         This works for all SDEs, including VE.
         """
         B, *D = x.shape
-        x0 = self.preconditioned_denoiser(t, x, *args, **kwargs) # Estimate of E[x0 | xt]
+        x0 = self.preconditioned_denoiser(t, x, *args, return_logvar=return_logvar, **kwargs) # Estimate of E[x0 | xt]
+        if return_logvar:
+            check_that_net_can_return_logvar(self.net.__class__.__name__)
+            x0, logvar = x0
         sigma = self.sde.sigma(t).view(B, *[1]*len(D))
         var = sigma**2
+        if return_logvar:
+            return (x0 - x) / var, logvar
         return (x0 - x) / var
 
-    def preconditioned_denoiser(self, t, x: Tensor, *args, **kwargs) -> Tensor:
+    def preconditioned_denoiser(self, t, x: Tensor, *args, return_logvar=False, **kwargs) -> Tensor:
         B, *D = x.shape
         # Broadcast the coefficients to the shape of x
-        F_theta = self.reparametrized_score(t, x, *args, **kwargs)
+        F_theta = self.reparametrized_score(t, x, *args, return_logvar=return_logvar, **kwargs)
+        if return_logvar:
+            check_that_net_can_return_logvar(self.net.__class__.__name__)
+            F_theta, logvar = F_theta
         c_out = self.sde.c_out(t).view(B, *[1]*len(D))
         c_skip = self.sde.c_skip(t).view(B, *[1]*len(D))
+        if return_logvar:
+            return c_skip * x + c_out * F_theta, logvar
         return c_skip * x + c_out * F_theta
     
     def _uniform_noise_level_distribution(self, B: int) -> Tensor:
@@ -93,7 +114,7 @@ class EDMScoreModel(ScoreModel):
             noise_level_distribution: Literal["uniform", "normal"] = "uniform",
             log_sigma_mean: float = -1.2,
             log_sigma_std: float = 1.2,
-            adaptive_loss_weights: bool = False,
+            adaptive_weights: bool = False,
             **kwargs
             ):
         if sample_noise_level_function is None:
@@ -111,7 +132,9 @@ class EDMScoreModel(ScoreModel):
             print(f"Using custom function {sample_noise_level_function.__name__} to sample nosie level ") 
             self.sample_noise_level = sample_noise_level_function
         
-        if adaptive_loss_weights:
-            raise NotImplementedError("Adaptive loss weights are not supported for EDM models.")
+        self.adaptive_weights = adaptive_weights
+        if adaptive_weights:
+            check_that_net_can_return_logvar(self.net.__class__.__name__)
+            print("Using adaptive weights of the noise levels in the DSM loss function.")
         return super().fit(*args, **kwargs)
 

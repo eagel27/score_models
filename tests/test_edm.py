@@ -1,4 +1,4 @@
-from score_models import ScoreModel, EDMScoreModel, MLP, NCSNpp, VPSDE, EDMv2Net
+from score_models import ScoreModel, EDMScoreModel, MLP, NCSNpp, VPSDE, EDMv2Net, MLPv2
 import torch
 import pytest
 
@@ -47,3 +47,35 @@ def test_edm_net(tmp_path):
     new_model = ScoreModel(path=tmp_path)
     out2 = new_model(t, x)
     assert torch.allclose(out, out2)
+
+
+def test_adaptive_weights():
+    D = 2
+    B = 10
+    net = MLPv2(D)
+    model = ScoreModel(net, "vp", formulation="edm")
+    
+    # Check that we can use return_logvar correctly
+    x = torch.randn(B, D)
+    t = torch.rand(B)
+    out, logvar = model.net(t, x, return_logvar=True)
+    assert tuple(out.shape) == (B, D)
+    assert tuple(logvar.shape) == (B, 1)
+    
+    # Check that this works also when calling the score
+    out, logvar = model(t, x, return_logvar=True)
+    assert tuple(out.shape) == (B, D)
+    assert tuple(logvar.shape) == (B, 1)
+    
+    # Check that the loss works correctly when using the uncertainty
+    loss = model.loss(x) # Baseline loss
+    # Check that the loss changes when we use the uncertainty as a way to check if it is applied
+    model.adaptive_weights = True # When calling fit, this varible triggers the use of the uncertainty layer
+    loss2 = model.loss(x)
+    assert torch.all(loss != loss2)
+    
+    # Check that a model instantiated with v1 neural nets yield an error
+    net = MLP(D)
+    model = ScoreModel(net, "vp", formulation="edm")
+    with pytest.raises(ValueError):
+        model(t, x, return_logvar=True)

@@ -30,7 +30,7 @@ class MLP(nn.Module):
         condition_channels: Optional[tuple[int]] = None,
         condition_embeddings: Optional[tuple[int]] = None,
         **kwargs,
-    ):
+        ):
         """
         Multi-Layer Perceptron (MLP) neural network.
 
