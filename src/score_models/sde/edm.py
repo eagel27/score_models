@@ -36,8 +36,9 @@ class EDMSDE(SDE):
         EDM column, time-steps row. Our implementation has sigma(t) and time steps interchanged.
         Also, our schedule is such that t=0 corresponds to sigma_min instead of sigma_max (reverse of Karras et al. 2022).
         """
-        sigma_diff = self.sigma_max**(1/rho) - self.sigma_min**(1/self.rho)
-        return (self.sigma_min**(1/rho) + (t/self.T) * sigma_diff)**self.rho
+        rho = self.rho
+        sigma_diff = self.sigma_max**(1/rho) - self.sigma_min**(1/rho)
+        return (self.sigma_min**(1/rho) + (t/self.T) * sigma_diff)**rho
         
     def diffusion(self, t: Tensor, x: Tensor) -> Tensor:
         B, *D = x.shape
