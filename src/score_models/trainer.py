@@ -108,7 +108,7 @@ class Trainer:
             self.ema_lengths = ema_lengths
             print(f"Using Karras EMA with ema lengths [" + ",".join([f"{sigma_rel:.2f}" for sigma_rel in ema_lengths]) + "]")
         elif ema_decay:
-            self.emas = [EMA(self.model, beta=ema_decay, start_update_after_step=update_ema_after_step, update_every=update_ema_every)]
+            self.emas = [EMA(self.model, beta=ema_decay, start_update_after_step=start_ema_after_step, update_every=update_ema_every)]
             self.ema_lengths = [None]
             print(f"Using traditional EMA with decay {ema_decay}")
         else:
