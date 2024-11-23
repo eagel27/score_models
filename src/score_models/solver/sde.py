@@ -1,10 +1,12 @@
 from typing import Callable, Optional
 
-import torch
 from torch import Tensor
-import numpy as np
 from tqdm import tqdm
 from .solver import Solver
+import torch
+import numpy as np
+
+__all__ = ["SDESolver", "EMSDESolver", "HeunSDESolver", "RK4SDESolver"]
 
 
 class SDESolver(Solver):
@@ -19,12 +21,10 @@ class SDESolver(Solver):
         progress_bar: bool = True,
         trace: bool = False,
         kill_on_nan: bool = False,
-        denoise_last_step: bool = False,
         time_steps: Optional[Tensor] = None,
         corrector_steps: int = 0,
         corrector_snr: float = 0.1,
         hook: Optional[Callable] = None,
-        sk: float = 0,  # Set to -1 for Ito SDE, TODO: make sure this is right
         **kwargs,
     ):
         """
@@ -51,56 +51,37 @@ class SDESolver(Solver):
             progress_bar: Whether to display a progress bar.
             trace: Whether to return the full path or just the last point.
             kill_on_nan: Whether to raise an error if NaNs are encountered.
-            denoise_last_step: Whether to project to the boundary at the last step.
             time_steps: Optional time steps to use for integration. Should be a 1D tensor containing the bin edges of the
                 time steps. For example, if one wanted 50 steps from 0 to 1, the time steps would be ``torch.linspace(0, 1, 51)``.
             corrector_steps: Number of corrector steps to add after each SDE step (0 for no corrector steps).
             corrector_snr: Signal-to-noise ratio for the corrector steps.
             hook: Optional hook function to call after each step. Will be called with the signature ``hook(t, x, sde, score, solver)``.
-            sk: Stratonovich correction term (set to -1 for Ito SDE).
         """
         B, *D = x.shape
 
         # Step
         T, dT = self.time_steps(steps, B, D, time_steps=time_steps, forward=forward, **kwargs)
-
-        # Trace if requested
         if trace:
             path = [x]
 
-        # Progress bar
         pbar = tqdm(tuple(zip(T, dT))) if progress_bar else zip(T, dT)
         for t, dt in pbar:
+            x = x + self.step(t, x, args, dt, forward, **kwargs)
+            for _ in range(corrector_steps):
+                x = self.corrector_step(t, x, args, corrector_snr, **kwargs)
+            
+            # Logs
             if progress_bar:
                 pbar.set_description(
                     f"t={t[0].item():.1g} | sigma={self.sde.sigma(t)[0].item():.1g} | "
                     f"x={x.mean().item():.1g}\u00B1{x.std().item():.1g}"
                 )
-
-            # Check for NaNs
             if kill_on_nan and torch.any(torch.isnan(x)):
                 raise ValueError("NaN encountered in SDE solver")
-
-            # Update x
-            x = x + self.step(t, x, args, dt, forward, sk=sk, **kwargs)
-
-            # Add requested corrector steps
-            for _ in range(corrector_steps):
-                x = self.corrector_step(t, x, args, corrector_snr, **kwargs)
-
             if trace:
                 path.append(x)
-
-            # Call hook
             if hook is not None:
                 hook(t, x, self.sde, self.sbm.score, self)
-
-        # Project to boundary if denoising
-        if denoise_last_step and not forward:
-            x = self.tweedie(t, x, *args, **kwargs)
-            if trace:
-                path[-1] = x
-
         if trace:
             return torch.stack(path)
         return x
@@ -128,42 +109,52 @@ class SDESolver(Solver):
         return self.drift(t, x, args, forward, **kwargs) * dt + self.sde.diffusion(t, x) * dw
 
 
-class EM_SDE(SDESolver):
+class EMSDESolver(SDESolver):
     """
     Base solver for a stochastic differential equation (SDE) using the Euler-Maruyama method.
     """
-
-    def step(self, t, x, args, dt, forward, sk=None, **kwargs):
-        """base SDE solver"""
+    def step(self, t, x, args, dt, forward, **kwargs):
         dw = torch.randn_like(x) * torch.sqrt(dt.abs())
         return self.dx(t, x, args, dt, forward, dw, **kwargs)
 
 
-class RK2_SDE(SDESolver):
-    def step(self, t, x, args, dt, forward, sk, **kwargs):
-        """Base SDE solver using a 2nd order Runge-Kutta method. For more
-        details see Equation 2.5 in chapter 7.2 of the book "Introduction to
-        Stochastic Differential Equations" by Thomas C. Gard. The equations have
-        been adapted by including a term ``skdt`` which allows for solving the
-        Ito SDE or the Stratonovich SDE."""
-        dw = torch.randn_like(x) * torch.sqrt(dt.abs())
-        skdt = sk * np.random.choice([-1, 1]) * torch.sqrt(dt.abs())
-        k1 = self.dx(t, x, args, dt, forward, dw - skdt, **kwargs)
-        k2 = self.dx(t + dt.squeeze(), x + k1, args, dt, forward, dw + skdt, **kwargs)
+class HeunSDESolver(SDESolver):
+    """
+    Base SDE solver using a 2nd order Runge-Kutta method. For more
+    details see Equation 2.5 in chapter 7.2 of the book "Introduction to
+    Stochastic Differential Equations" by Thomas C. Gard. 
+    
+    This solver adopts the Stratonovich interpretation of the SDE, 
+    though we note that the interpretation does not affect our package 
+    because our diffusion coefficient are homogeneous, i.e. they do not depend on x. 
+    The dependence of sde.diffusion on x is artificial in that it's only used 
+    to infer the shape of the state space.
+    """
+    def step(self, t, x, args, dt, forward, **kwargs):
+        z = torch.randn_like(x)
+        dw = z * torch.sqrt(dt.abs())
+        k1 = self.dx(t, x, args, dt, forward, dw, **kwargs)
+        k2 = self.dx(t + dt.squeeze(), x + k1, args, dt, forward, dw, **kwargs)
         return (k1 + k2) / 2
 
 
-class RK4_SDE(SDESolver):
-    def step(self, t, x, args, dt, forward, sk, **kwargs):
-        """Base SDE solver using a 4th order Runge-Kutta method. For more
-        details see Equation 3.6 in chapter 7.3 of the book "Introduction to
-        Stochastic Differential Equations" by Thomas C. Gard. The equations have
-        been adapted by including a term ``skdt`` which allows for solving the
-        Ito SDE or the Stratonovich SDE."""
-        dw = torch.randn_like(x) * torch.sqrt(dt.abs())
-        skdt = sk * np.random.choice([-1, 1]) * torch.sqrt(dt.abs())
-        k1 = self.dx(t, x, args, dt, forward, dw - skdt, **kwargs)
-        k2 = self.dx(t + dt.squeeze() / 2, x + k1 / 2, args, dt, forward, dw + skdt, **kwargs)
-        k3 = self.dx(t + dt.squeeze() / 2, x + k2 / 2, args, dt, forward, dw - skdt, **kwargs)
-        k4 = self.dx(t + dt.squeeze(), x + k3, args, dt, forward, dw + skdt, **kwargs)
+class RK4SDESolver(SDESolver):
+    """Base SDE solver using a 4th order Runge-Kutta method. For more
+    details see Equation 3.6 in chapter 7.3 of the book "Introduction to
+    Stochastic Differential Equations" by Thomas C. Gard. 
+    
+    This solver adopts the Stratonovich interpretation of the SDE, 
+    though we note that the interpretation does not affect our package 
+    because our diffusion coefficient are homogeneous, i.e. they do not depend on x. 
+    The dependence of sde.diffusion on x is artificial in that it's only used 
+    to infer the shape of the state space.
+    """
+    def step(self, t, x, args, dt, forward, **kwargs):
+        z = torch.randn_like(x)
+        dw = z * torch.sqrt(dt.abs())
+        k1 = self.dx(t, x, args, dt, forward, dw, **kwargs)
+        k2 = self.dx(t + dt.squeeze() / 2, x + k1 / 2, args, dt, forward, dw, **kwargs)
+        k3 = self.dx(t + dt.squeeze() / 2, x + k2 / 2, args, dt, forward, dw, **kwargs)
+        k4 = self.dx(t + dt.squeeze(), x + k3, args, dt, forward, dw, **kwargs)
         return (k1 + 2 * k2 + 2 * k3 + k4) / 6
+

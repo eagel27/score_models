@@ -2,8 +2,8 @@ import torch
 from torch import Tensor
 
 from ..sde import SDE
-from .score_model import ScoreModel
 from ..architectures import NullNet
+from .score_model import ScoreModel
 
 
 class SampleScoreModel(ScoreModel):
@@ -43,7 +43,7 @@ class SampleScoreModel(ScoreModel):
     def score(self, t: Tensor, x: Tensor, *args, **kwargs):
         B, *D = x.shape
         K, *D = self.samples.shape
-        sigma_t = self.sde.sigma(t[0])
+        sigma_t = self.sde.sigma(t[0]) # This is wrong, should be calculated for all t, not assume t[0]
         mu_t = self.sde.mu(t[0])
         W = torch.sum(
             -0.5
@@ -62,3 +62,12 @@ class SampleScoreModel(ScoreModel):
             dim=1,
         )  # B, *D
         return scores
+    
+    def reparametrized_score(self, t: Tensor, x: Tensor, *args, **kwargs):
+        raise RuntimeError("Reparametrized score is not defined for sample models.")
+
+    def save(self, *args, **kwargs):
+        raise RuntimeError("Sample models cannot be saved.")
+
+    def load(self, *args, **kwargs):
+        raise RuntimeError("Sample models cannot be loaded.")

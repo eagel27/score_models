@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
-import torch
-from torch import Tensor
-
 from ..utils import DEVICE
+from torch import Tensor
+import torch
+
 
 __all__ = ["Solver"]
 
@@ -33,7 +33,8 @@ class Solver(ABC):
         if solver is not None:
             SOLVERS = all_subclasses(cls)
             try:
-                return super(Solver, cls).__new__(SOLVERS[solver.lower()])
+                # Removed arguments from super to fix autoreload bug in jupyter notebooks
+                return super().__new__(SOLVERS[solver.lower()])
             except KeyError:
                 raise ValueError(
                     f'Unknown solver type: "{solver}". Must be one of {list(filter(lambda s: "_" in s, SOLVERS.keys()))}'
@@ -130,11 +131,3 @@ class Solver(ABC):
         t_max = kwargs.get("t_max", self.sde.t_max)
         return torch.as_tensor(h * (t_max - t_min) / steps, device=device)
 
-    def tweedie(self, t: Tensor, x: Tensor, *args, **kwargs) -> Tensor:
-        """
-        Compute the Tweedie formula for the expectation E[x0 | xt]
-        """
-        B, *D = x.shape
-        mu = self.sde.mu(t).view(-1, *[1] * len(D))
-        sigma = self.sde.sigma(t).view(-1, *[1] * len(D))
-        return (x + sigma**2 * self.sbm.score(t, x, *args, **kwargs)) / mu

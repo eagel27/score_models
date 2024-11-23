@@ -1,9 +1,12 @@
-import torch
-from .sde import SDE
 from torch import Tensor
 from torch.distributions import Normal, Independent
 from score_models.utils import DEVICE
+from .sde import SDE
+import torch
 import numpy as np
+
+
+__all__ = ["VESDE"]
 
 
 class VESDE(SDE):
@@ -30,11 +33,6 @@ class VESDE(SDE):
     def sigma(self, t: Tensor) -> Tensor:
         return self.sigma_min * (self.sigma_max / self.sigma_min) ** (t / self.T)
 
-    def t_sigma(self, sigma: Tensor) -> Tensor:
-        return torch.log(torch.as_tensor(sigma / self.sigma_min, device=DEVICE)) / torch.log(
-            torch.as_tensor(self.sigma_max / self.sigma_min, device=DEVICE)
-        )
-
     def diffusion(self, t: Tensor, x: Tensor) -> Tensor:
         _, *D = x.shape  # broadcast diffusion coefficient to x shape
         # Analytical derivative of the sigma**2 function, square rooted at the end
@@ -48,3 +46,17 @@ class VESDE(SDE):
         if mean is None:
             mean = torch.zeros(shape).to(device)
         return Independent(Normal(loc=mean, scale=self.sigma_max, validate_args=False), len(shape))
+
+    def sigma_inverse(self, sigma: Tensor) -> Tensor:
+        sigma_d = torch.as_tensor(self.sigma_max / self.sigma_min, device=DEVICE)
+        return torch.log(sigma/self.sigma_min) / torch.log(sigma_d) * self.T
+    
+    def c_skip(self, t: Tensor) -> Tensor:
+        return torch.ones_like(t)
+
+    def c_out(self, t: Tensor) -> Tensor:
+        return self.sigma(t)
+    
+    def c_in(self, t: Tensor) -> Tensor:
+        return torch.ones_like(t)
+

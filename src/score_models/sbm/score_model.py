@@ -9,6 +9,7 @@ from ..sde import SDE
 from ..losses import dsm
 from ..solver import Solver, ODESolver
 from ..utils import DEVICE
+from ..save_load_utils import load_hyperparameters
 if TYPE_CHECKING:
     from score_models import HessianDiagonal
 
@@ -17,6 +18,23 @@ __all__ = ["ScoreModel"]
 
 
 class ScoreModel(Base):
+    def __new__(cls, *args, **kwargs):
+        path = kwargs.get("path", None)
+        if path is not None:
+            try:
+                hyperparameters = load_hyperparameters(path) 
+                formulation = hyperparameters.get("formulation", "original")
+            except FileNotFoundError:
+                # Freak case where a new model is created from scratch with a path (so no hyperparameters is present)
+                formulation = kwargs.get("formulation", "original")
+        else:
+            formulation = kwargs.get("formulation", "original")
+        if formulation.lower() == "edm":
+            from score_models import EDMScoreModel
+            return super().__new__(EDMScoreModel)
+        else:
+            return super().__new__(cls)
+
     def __init__(
         self,
         net: Optional[Union[str, Module]] = None,
@@ -33,7 +51,7 @@ class ScoreModel(Base):
         else:
             self.dlogp = None
 
-    def loss(self, x, *args, step: int) -> Tensor:
+    def loss(self, x, *args) -> Tensor:
         return dsm(self, x, *args)
 
     def reparametrized_score(self, t, x, *args, **kwargs) -> Tensor:
@@ -61,8 +79,8 @@ class ScoreModel(Base):
         x,
         *args,
         steps: int,
-        t=0.0,
-        solver: Literal["euler_ode", "rk2_ode", "rk4_ode"] = "euler_ode",
+        t: float = 0.0,
+        solver: Literal["Euler", "Heun", "RK4"] = "Euler",
         **kwargs
     ) -> Tensor:
         """
@@ -71,6 +89,9 @@ class ScoreModel(Base):
         developed by Chen et al. 2018 (arxiv.org/abs/1806.07366).
         See Song et al. 2020 (arxiv.org/abs/2011.13456) for usage with SDE formalism of SBM.
         """
+        if t == 0.0:
+            t = self.sde.t_min
+        solver = solver + "ODESolver" if "ODESolver" not in solver else solver
         B, *D = x.shape
         solver = ODESolver(self, solver=solver, **kwargs)
         # Solve the probability flow ODE up in temperature to time t=1.
@@ -88,8 +109,8 @@ class ScoreModel(Base):
         shape: tuple,  # TODO grab dimensions from model hyperparams if available
         steps: int,
         solver: Literal[
-            "em_sde", "rk2_sde", "rk4_sde", "euler_ode", "rk2_ode", "rk4_ode"
-        ] = "em_sde",
+            "EMSDESolver", "HeunSDESolver", "RK4SDESolver", "EulerODESolver", "HeunODESolver", "RK4ODESolver"
+        ] = "EMSDESolver",
         progress_bar: bool = True,
         denoise_last_step: bool = True,
         **kwargs
@@ -110,9 +131,11 @@ class ScoreModel(Base):
             steps=steps,
             forward=False,
             progress_bar=progress_bar,
-            denoise_last_step=denoise_last_step,
             **kwargs
         )
+        if denoise_last_step:
+            t = self.sde.t_min * torch.ones(B, device=self.device)
+            x0 = self.tweedie(t, x0, *args, **kwargs)
         return x0
 
     @torch.no_grad()
@@ -123,10 +146,9 @@ class ScoreModel(Base):
         *args,
         steps: int,
         solver: Literal[
-            "em_sde", "rk2_sde", "rk4_sde", "euler_ode", "rk2_ode", "rk4_ode"
-        ] = "em_sde",
+            "EMSDESolver", "HeunSDESolver", "RK4SDESolver", "EulerODESolver", "HeunODESolver", "RK4ODESolver"
+        ] = "EMSDESolver",
         progress_bar: bool = True,
-        denoise_last_step: bool = True,
         **kwargs
     ) -> Tensor:
         """
@@ -142,9 +164,11 @@ class ScoreModel(Base):
             steps=steps,
             forward=False,
             progress_bar=progress_bar,
-            denoise_last_step=denoise_last_step,
             **kwargs
         )
+        # Denoise last step with Tweedie
+        t = self.sde.t_min * torch.ones(x0.shape[0], device=self.device)
+        x0 = self.tweedie(t, x0, *args, **kwargs)
         return x0
 
     def tweedie(self, t: Tensor, x: Tensor, *args, **kwargs) -> Tensor:

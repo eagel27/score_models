@@ -89,7 +89,9 @@ class LoRAScoreModel(ScoreModel):
             self,
             path: Optional[str] = None,
             optimizer: Optional[torch.optim.Optimizer] = None,
-            create_path: bool = True
+            create_path: bool = True,
+            step: Optional[int] = None, # Iteration number
+            ema_length: Optional[float] = None, # Relative EMA length scale
             ):
         """
         Update the save method to save only one copy of the base SBM alongside the LoRA checkpoints.
@@ -105,7 +107,7 @@ class LoRAScoreModel(ScoreModel):
             if optimizer: # Save optimizer first since checkpoint number is inferred from number of checkpoint files 
                 save_checkpoint(model=optimizer, path=path, key="optimizer", create_path=create_path)
             # Save the LoRA adapters only (takes less space than saving the whole merged model)
-            save_checkpoint(model=self.lora_net, path=path, key="lora_checkpoint", create_path=create_path)
+            save_checkpoint(model=self.lora_net, path=path, key="lora_checkpoint", create_path=create_path, step=step, ema_length=ema_length)
             self.save_hyperparameters(path)
         else:
             raise ValueError("No path provided to save the model. Please provide a valid path or initialize the model with a path.")
@@ -113,10 +115,13 @@ class LoRAScoreModel(ScoreModel):
     def load(
             self,
             checkpoint: Optional[int] = None,
+            ema_length: Optional[float] = None,
             raise_error: bool = True
             ):
         if self.path is None:
             raise ValueError("A checkpoint can only be loaded if the model is instantiated with a path, e.g. model = ScoreModel(path='path/to/checkpoint').")
+        if ema_length is not None:
+            raise ValueError("LoRA models do not support EMA lengths yet.")
         # Load base SBM (and freeze it)
         base_path = os.path.join(self.path, "base_sbm")
         self.net = ScoreModel(path=base_path).net

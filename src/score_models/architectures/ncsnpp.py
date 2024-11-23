@@ -35,7 +35,7 @@ class NCSNpp(nn.Module):
         dimensions: Literal[1, 2, 3] = 2,
         nf: int = 128,
         ch_mult: tuple[int] = (2, 2, 2, 2),
-        num_res_blocks: int = 2,
+        num_blocks: int = 2,
         activation_type: str = "swish",
         dropout: float = 0.0,
         resample_with_conv: bool = True,
@@ -45,12 +45,12 @@ class NCSNpp(nn.Module):
         progressive: Literal["none", "output_skip", "residual"] = "output_skip",
         progressive_input: Literal["none", "input_skip", "residual"] = "input_skip",
         init_scale: float = 1e-2,
-        fourier_scale: float = 16.0,
+        fourier_scale: float = 0.02, # Leads to much smoother score function (Lu & Song, https://arxiv.org/abs/2410.11081)
         resblock_type: Literal["biggan", "ddpm"] = "biggan",
         combine_method: Literal["cat", "sum"] = "cat",
         attention: bool = True,
         conditions: Optional[
-            tuple[Literal["time_discrete", "time_continuous", "time_vector", "input_tensor"]]
+            tuple[Literal["time_discrete", "time_continuous", "time_vector", "input_tensor"]] # TODO: make better names
         ] = None,
         condition_embeddings: Optional[tuple[int]] = None,
         condition_channels: Optional[int] = None,
@@ -67,7 +67,7 @@ class NCSNpp(nn.Module):
             dimensions (Literal[1, 2, 3]): Number of dimensions for input data. Default is 2.
             nf (int): Number of filters in the first layer. Default is 128.
             ch_mult (tuple[int]): Channel multiplier for each layer. Default is (2, 2, 2, 2).
-            num_res_blocks (int): Number of residual blocks. Default is 2.
+            num_blocks (int): Number of residual blocks. Default is 2.
             activation_type (str): Type of activation function to use. Default is "swish".
             dropout (float): Dropout probability. Default is 0.
             resample_with_conv (bool): Whether to resample with convolution. Default is True.
@@ -86,6 +86,9 @@ class NCSNpp(nn.Module):
             condition_channels (Optional[int]): Number of channels for conditions. Default is None.
         """
         super().__init__()
+        # Backward compatibility
+        num_blocks = kwargs.get("num_res_blocks", num_blocks)
+
         if dimensions not in [1, 2, 3]:
             raise ValueError(
                 "Input must have 1, 2, or 3 spatial dimensions to use this architecture"
@@ -100,7 +103,7 @@ class NCSNpp(nn.Module):
         self.act = act = get_activation(activation_type)
         self.attention = attention
         self.nf = nf
-        self.num_res_blocks = num_res_blocks
+        self.num_blocks = num_blocks
         self.num_resolutions = num_resolutions = len(ch_mult)
         self.skip_rescale = skip_rescale
         self.progressive = progressive.lower()
@@ -119,7 +122,7 @@ class NCSNpp(nn.Module):
             "nf": nf,
             "activation_type": activation_type,
             "ch_mult": ch_mult,
-            "num_res_blocks": num_res_blocks,
+            "num_blocks": num_blocks,
             "resample_with_conv": resample_with_conv,
             "dropout": dropout,
             "fir": fir,
@@ -237,7 +240,7 @@ class NCSNpp(nn.Module):
         in_ch = nf  # + fourier_feature_channels
         for i_level in range(num_resolutions):
             # Residual blocks for this resolution
-            for i_block in range(num_res_blocks):
+            for i_block in range(num_blocks):
                 out_ch = nf * ch_mult[i_level]
                 modules.append(ResnetBlock(in_ch=in_ch, out_ch=out_ch))
                 in_ch = out_ch
@@ -267,7 +270,7 @@ class NCSNpp(nn.Module):
         pyramid_ch = 0
         # Upsampling block
         for i_level in reversed(range(num_resolutions)):
-            for i_block in range(num_res_blocks + 1):
+            for i_block in range(num_blocks + 1):
                 out_ch = nf * ch_mult[i_level]
                 modules.append(ResnetBlock(in_ch=in_ch + hs_c.pop(), out_ch=out_ch))
                 in_ch = out_ch
@@ -361,7 +364,7 @@ class NCSNpp(nn.Module):
         hs = [modules[m_idx](x)]
         m_idx += 1
         for i_level in range(self.num_resolutions):
-            for i_block in range(self.num_res_blocks):
+            for i_block in range(self.num_blocks):
                 h = modules[m_idx](hs[-1], temb)
                 torch.var(h)
                 m_idx += 1
@@ -401,7 +404,7 @@ class NCSNpp(nn.Module):
 
         # Upsampling block
         for i_level in reversed(range(self.num_resolutions)):
-            for i_block in range(self.num_res_blocks + 1):
+            for i_block in range(self.num_blocks + 1):
                 h = modules[m_idx](torch.cat([h, hs.pop()], dim=1), temb)
                 m_idx += 1
 

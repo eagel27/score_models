@@ -6,6 +6,8 @@ from torch.distributions import Normal, Independent
 from torch.distributions import Distribution
 from torch import Tensor
 
+__all__ = ["SDE"]
+
 
 class SDE(ABC):
     """
@@ -44,7 +46,7 @@ class SDE(ABC):
     def sigma(self, t) -> Tensor: ...
 
     @abstractmethod
-    def t_sigma(self, sigma) -> Tensor: ...
+    def sigma_inverse(self, sigma) -> Tensor: ...
 
     @abstractmethod
     def prior(self, shape) -> Distribution:

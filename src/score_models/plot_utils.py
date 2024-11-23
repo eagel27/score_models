@@ -2,7 +2,6 @@ from typing import Callable
 
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.pylab as pylab
 import matplotlib.cm as cm
 import scienceplots # pip install SciencePlots
 import colorcet as cc # pip install colorcet
@@ -14,7 +13,7 @@ from matplotlib.colors import Normalize
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-plt.style.use('dark_background')
+# plt.style.use('dark_background')
 plt.style.use('science')
 params = {
          'figure.figsize': (4, 4),
@@ -28,7 +27,7 @@ params = {
          'ytick.major.size': 8,
          'ytick.minor.size': 4,
          'text.usetex': True,
-         'text.latex.preamble': r'\usepackage{bm}',
+         'text.latex.preamble': r'\usepackage{bm, physics}',
          }
 pylab.rcParams.update(params)
 cmap = cc.cm.fire
@@ -38,18 +37,23 @@ def plot_density(
         fig=None, 
         ax=None, 
         extent=(-2, 2, -2, 2),
-        dx=0.025, 
-        dy=0.025,
+        dx=None, 
+        dy=None,
         colorbar=False, 
         cmap=cmap, 
         vmin=None, 
-        vmax=None, 
+        vmax=None,
+        bins=100,
         **kwargs):
     """
     Plot the density of a log probability function
     """
     # Generate a grid of points
     (xmin, xmax, ymin, ymax) = extent
+    if dx is None:
+        dx = (xmax - xmin) / bins
+    if dy is None:
+        dy = (ymax - ymin) / bins
     x = np.arange(xmin, xmax, dx)
     y = np.arange(ymin, ymax, dy)
     n = x.size
@@ -65,7 +69,7 @@ def plot_density(
     im = ax.imshow(p, extent=extent, cmap=cmap, norm=norm, aspect="auto", origin="lower", **kwargs)
     if colorbar and fig is not None:
         cax = fig.colorbar(im, ax=ax, fraction=0.038, pad=0.02)
-        cax.set_ylabel(r'$p(\mathbf{x})$')
+        cax.ax.set_ylabel(r'$p(\mathbf{x})$')
     return ax
 
 def plot_scatter(
@@ -78,6 +82,7 @@ def plot_scatter(
         ticks=None, 
         colorbar=False, 
         cmap=cmap, 
+        extent=None,
         **kwargs):
     """
     Scatter plot colored by 2d histogram
@@ -106,6 +111,9 @@ def plot_scatter(
         cax = plt.axes([box.x0*1.01 + box.width * 1.05, box.y0, 0.02, box.height])
         fig.colorbar(sm, cax=cax, ticks=ticks)
         cax.set_ylabel(r'$p(\mathbf{x})$')
+    if extent is not None:
+        ax.set_xlim(extent[:2])
+        ax.set_ylim(extent[2:])
     return ax
 
 
@@ -149,14 +157,19 @@ def plot_contours(
         ax=None,
         extent=(-2, 2, -2, 2),
         ci: tuple = (0.68, 0.95, 0.99),
-        dx=0.025, 
-        dy=0.025,
+        dx=None,
+        dy=None,
         cmap=cc.cm.fire,
         ):
     """
     Plot density contours
     """
+    # Generate a grid of points
     (xmin, xmax, ymin, ymax) = extent
+    if dx is None:
+        dx = (xmax - xmin) / 100
+    if dy is None:
+        dy = (ymax - ymin) / 100
     x = np.arange(xmin, xmax, dx)
     y = np.arange(ymin, ymax, dy)
     n = x.size
@@ -164,14 +177,14 @@ def plot_contours(
     points = np.stack(np.meshgrid(x, y), axis=-1).reshape((-1, 2))
     # Compute log probability and normalize to get the density
     logp = logp_fn(torch.tensor(points).to(DEVICE)).detach().numpy().reshape([m, n])
-    p = np.exp(logp - logsumexp(logp))
+    p = np.exp(logp - logsumexp(logp + np.log(dx) + np.log(dy)))
     # Compute the cumulative probability
     cumul = np.sort(p.ravel() * dx * dy)[::-1].cumsum()
     ps = []
     for _ci in ci:
         p_at_ci = np.sort(p.ravel())[::-1][np.argmin((cumul - _ci)**2)]
         ps.append(p_at_ci)
-    colors = [cmap(i/(len(ci)-1)) for i in range(len(ci))]
+    colors = [cmap(i/max(len(ci)-1, 1)) for i in range(len(ci))]
     contours = ax.contour(x, y, p, levels=ps[::-1], colors=colors, linewidths=2, linestyles="--")
     if ax is None:
         fig, ax = plt.subplots()

@@ -12,6 +12,7 @@ from ..utils import DEVICE
 from ..losses import (
         second_order_dsm, 
         second_order_dsm_meng_variation,
+        joint_second_order_dsm
         )
 from ..solver import ODESolver
 
@@ -27,13 +28,13 @@ class HessianDiagonal(Base):
             path: Optional[str] = None,
             checkpoint: Optional[int] = None,
             device: torch.device = DEVICE,
-            loss: Literal["lu", "meng"] = "meng",
+            loss: Literal["lu", "meng", "joint"] = "meng",
+            second_order_weight: float = 1.,
             **hyperparameters
             ):
         if isinstance(score_model, ScoreModel):
             sde = score_model.sde
         super().__init__(net, sde, path, checkpoint=checkpoint, device=device, **hyperparameters)
-        # Check if SBM has been loaded, otherwise use the user provided SBM
         if not hasattr(self, "score_model"):
             if not isinstance(score_model, ScoreModel):
                 raise ValueError("Must provide a ScoreModel instance to instantiate the HessianDiagonal model.")
@@ -42,12 +43,14 @@ class HessianDiagonal(Base):
             self._loss = second_order_dsm
         elif loss.lower() == "meng":
             self._loss = second_order_dsm_meng_variation
+        elif loss.lower() == "joint":
+            self._loss = lambda model, x, *args: joint_second_order_dsm(model, x, *args, lambda_1=second_order_weight)
         else:
-            raise ValueError(f"Loss function {loss} is not recognized. Choose between 'Lu' or 'Meng' loss functions.")
-        # Make sure ScoreModel weights are frozen (this class does not allow joint optimization for now)
-        for p in self.score_model.net.parameters():
-            p.requires_grad = False
-        print("Score model weights are now frozen. This class does not currently support joint optimization.")
+            raise ValueError(f"Loss function {loss} is not recognized. Choose between 'Lu', 'Meng' or the 'Joint' loss functions.")
+        if loss.lower() != "joint":
+            for p in self.score_model.net.parameters():
+                p.requires_grad = False
+            print("Score model weights are now frozen. Use the 'joint' loss to optimize the score model as well.")
    
     def forward(self, t: Tensor, x: Tensor, *args, **kwargs) -> Tensor:
         return self.diagonal(t, x, *args, **kwargs)
@@ -55,7 +58,7 @@ class HessianDiagonal(Base):
     def score(self, t: Tensor, x: Tensor, *args, **kwargs) -> Tensor:
         return self.score_model.score(t, x, *args, **kwargs)
     
-    def loss(self, x: Tensor, *args, step: int) -> Tensor:
+    def loss(self, x: Tensor, *args) -> Tensor:
         return self._loss(self, x, *args)
     
     def reparametrized_diagonal(self, t: Tensor, x: Tensor, *args, **kwargs) -> Tensor:
@@ -113,13 +116,21 @@ class HessianDiagonal(Base):
             path: Optional[str] = None, 
             optimizer: Optional[torch.optim.Optimizer] = None,
             create_path: bool = True,
+            step: Optional[int] = None, # Iteration number
+            ema_length: Optional[float] = None, # Relative EMA length scale
             ):
         """
         We use the super method to save checkpoints of the hessian diagonal network.
         We need to save a copy of the score model net and hyperparameters 
         in order to reload it correctly. This method add special routines for that.
         """
-        super().save(path, optimizer, create_path) # Save Hessian net
+        # Save Hessian net
+        super().save(
+                path=path, 
+                optimizer=optimizer, 
+                create_path=create_path, 
+                step=step, 
+                ema_length=ema_length) 
         # Create a sub directory for the SBM 
         path = path or self.path
         sbm_path = os.path.join(path, "score_model")
@@ -129,12 +140,13 @@ class HessianDiagonal(Base):
     def load(
             self, 
             checkpoint: Optional[int] = None, 
-            raise_error: bool = True
+            ema_length: Optional[float] = None,
+            raise_error: bool = True,
             ):
         """
         Super method reloads the HessianDiagonal net.
         Then we load the base score model from the score_model sub-directory.
         """
-        super().load(checkpoint, raise_error)
+        super().load(checkpoint, ema_length=ema_length, raise_error=raise_error)
         sbm_path = os.path.join(self.path, "score_model")
         self.score_model = ScoreModel(path=sbm_path)

@@ -8,6 +8,8 @@ import torch.nn.functional as F
 from torch.func import grad, vmap
 from score_models.utils import DEVICE
 
+__all__ = ["TSVESDE"]
+
 
 class TSVESDE(SDE):
     def __init__(
@@ -61,7 +63,7 @@ class TSVESDE(SDE):
         log_coeff = self.beta_fn(t) + (smax - smin) * t / self.T + smin
         return torch.exp(log_coeff)
 
-    def t_sigma(self, sigma: Tensor) -> Tensor:
+    def sigma_inverse(self, sigma: Tensor) -> Tensor:
         """
         Inverse of the sigma function. Should give the time at which the kernel has standard deviation sigma.
         """

@@ -1,10 +1,12 @@
 from typing import Callable, Literal, Optional
 
-import torch
 from torch import Tensor
 from torch.func import vjp, vmap
 from tqdm import tqdm
 from .solver import Solver
+import torch
+
+__all__ = ["ODESolver", "EulerODESolver", "HeunODESolver", "RK4ODESolver"]
 
 
 class ODESolver(Solver):
@@ -13,13 +15,12 @@ class ODESolver(Solver):
     def solve(
         self,
         x: Tensor,
-        *args: tuple,
+        *args,
         steps: int,
         forward: bool,
         progress_bar: bool = True,
         trace: bool = False,
         kill_on_nan: bool = False,
-        denoise_last_step: bool = False,
         time_steps: Optional[Tensor] = None,
         dlogp: Optional[Callable] = None,
         return_dlogp: bool = False,
@@ -50,7 +51,6 @@ class ODESolver(Solver):
             progress_bar: Whether to display a progress bar.
             trace: Whether to return the full path or just the last point.
             kill_on_nan: Whether to raise an error if NaNs are encountered.
-            denoise_last_step: Whether to project to the boundary at the last step.
             dlogp: Optional function to compute the divergence of the drift function.
             return_dlogp: Whether to return the log probability change.
             time_steps: Optional time steps to use for integration. Should be a 1D tensor containing the bin edges of the
@@ -90,11 +90,6 @@ class ODESolver(Solver):
                 path.append(x)
             if hook is not None:
                 hook(t, x, self.sde, self.sbm.score, self)
-
-        if denoise_last_step and not forward:
-            x = self.tweedie(t, x, *args, **kwargs)
-            if trace:
-                path[-1] = x
         if trace:
             if return_dlogp:
                 return torch.stack(path), logp
@@ -144,7 +139,7 @@ class ODESolver(Solver):
         return divergence
 
 
-class Euler_ODE(ODESolver):
+class EulerODESolver(ODESolver):
     """
     Euler method for solving an ODE
     """
@@ -153,11 +148,10 @@ class Euler_ODE(ODESolver):
         return dx(t, x, *args, dt=dt, **kwargs), dp(t, x, *args, dt=dt, **kwargs)
 
 
-class RK2_ODE(ODESolver):
+class HeunODESolver(ODESolver):
     """
-    Runge Kutta 2nd order ODE solver
+    Runge Kutta 2nd order ODE solver, also know as Heun method
     """
-
     def step(self, t, x, *args, dt, dx, dp, **kwargs):
         k1 = dx(t, x, *args, dt=dt, **kwargs)
         l1 = dp(t, x, *args, dt=dt, **kwargs)
@@ -166,11 +160,10 @@ class RK2_ODE(ODESolver):
         return (k1 + k2) / 2, (l1 + l2) / 2
 
 
-class RK4_ODE(ODESolver):
+class RK4ODESolver(ODESolver):
     """
     Runge Kutta 4th order ODE solver
     """
-
     def step(self, t, x, *args, dt, dx, dp, **kwargs):
         k1 = dx(t, x, *args, dt=dt, **kwargs)
         l1 = dp(t, x, *args, dt=dt, **kwargs)
@@ -181,3 +174,4 @@ class RK4_ODE(ODESolver):
         k4 = dx(t + dt.squeeze(), x + k3, *args, dt=dt, **kwargs)
         l4 = dp(t + dt.squeeze(), x + k3, *args, dt=dt, **kwargs)
         return (k1 + 2 * k2 + 2 * k3 + k4) / 6, (l1 + 2 * l2 + 2 * l3 + l4) / 6
+

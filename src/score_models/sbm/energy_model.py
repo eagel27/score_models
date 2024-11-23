@@ -1,9 +1,8 @@
-from typing import Union, Optional
-
+from typing import Optional, Union
+import torch
 from torch.func import grad
 from torch import vmap
 from torch.nn import Module
-import torch
 
 from .score_model import ScoreModel
 from ..utils import DEVICE

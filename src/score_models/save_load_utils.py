@@ -22,6 +22,38 @@ from .utils import DEVICE
 def checkpoint_number(path: str) -> int:
     return int(re.findall(r'[0-9]+', path)[-1])
 
+def next_checkpoint(path: str, ema_length: Optional[float] = None) -> int:
+    return last_checkpoint(path, ema_length) + 1
+
+def last_checkpoint(path: str, ema_length: Optional[float] = None) -> int:
+    if ema_length is not None:
+        pattern = f"*checkpoint*emalength{ema_length:.2f}*"
+    else:
+        pattern = "*checkpoint*"
+    if os.path.isdir(path):
+        paths = sorted(glob.glob(os.path.join(path, pattern)), key=checkpoint_number)
+        if len(paths) > 0:
+            return checkpoint_number(paths[-1])
+        else:
+            if ema_length is not None:
+                # Some safeguard, remove when no longuer necessary, when a proper error message is provided.
+                print(f"No checkpoint found with EMA length {ema_length}.")
+            return 0
+    else:
+        return 0
+
+def ema_length_from_path(path: str) -> float:
+    path = str(path).split("/")[-1]
+    el = [float(s[-4:]) for s in str(path).split("_") if "emalength" in s]
+    if el:
+        return el[0]
+    else:
+        return None
+
+def step_from_path(path: str) -> int:
+    path = str(path).split("/")[-1]
+    return int([s[4:] for s in str(path).split("_") if "step" in s][0])
+
 
 def maybe_raise_error(message: str, throw_error: bool = True, error_type=FileNotFoundError):
     if throw_error:
@@ -29,46 +61,47 @@ def maybe_raise_error(message: str, throw_error: bool = True, error_type=FileNot
     else:
         warnings.warn(message)
 
-
-def last_checkpoint(path: str) -> int:
-    if os.path.isdir(path):
-        paths = sorted(glob.glob(os.path.join(path, "*checkpoint*")), key=checkpoint_number)
-        if len(paths) > 0:
-            return checkpoint_number(paths[-1])
-        else:
-            return 0
+def find_checkpoint(path: str, checkpoint: int, ema_length: Optional[float] = None) -> str:
+    if ema_length is not None:
+        pattern = f"*checkpoint*emalength{ema_length:.2f}*"
     else:
-        return 0
-
-
-def next_checkpoint(path: str) -> int:
-    return last_checkpoint(path) + 1
+        pattern = "*checkpoint*"
+    paths = sorted(glob.glob(os.path.join(path, pattern)), key=checkpoint_number)
+    checkpoints = [checkpoint_number(os.path.split(path)[-1]) for path in paths]
+    # Check for duplicates
+    if checkpoint in checkpoints:
+        return paths[checkpoints.index(checkpoint)]
+    else:
+        raise FileNotFoundError(f"Checkpoint {checkpoint} not found in {path}.")
 
 
 def save_checkpoint(
         model: Module,
         path: str,
         create_path: bool = True,
-        key: Literal["checkpoint", "optimizer", "lora_checkpoint"] = "checkpoint"
+        key: Literal["checkpoint", "optimizer", "lora_checkpoint"] = "checkpoint",
+        step: Optional[int] = None,
+        ema_length: Optional[float] = None,
         ):
     """
     Utility function to save checkpoints of a model and its optimizer state. 
     This utility will save files in path with the following pattern
     ```
         Path
-        ├── checkpoint_001.pt
-        ├── checkpoint_002.pt
-        ├── ...
-        ├── optimizer_001.pt
-        ├── optimizer_002.pt
+        ├── key_*_001.pt
+        ├── key_*_002.pt
         ├── ...
     ```
+    Where key signifies the type of model. For checkpoints, step and ema_length can be provided,
+    which will save this information in the filename.
     
     Args:
         model: Model instance to save.
         path: Path to a directory where to save the checkpoint files. Defaults to the path in the ScoreModel instance.
         create_path: If True, create the directory if it does not exist.
         key: Key to save the checkpoint with. Defaults to "checkpoint". Alternative is "optimizer".
+        step: The iteration number to save. This information is saved in the filename.
+        ema_length: The relative EMA length scale to save. This information is saved in the filename to be used latter.
     """
     if not os.path.isdir(path):
         if create_path:
@@ -76,15 +109,21 @@ def save_checkpoint(
         else:
             raise FileNotFoundError(f"Directory {os.path.dirname(path)} does not exist")
 
-    checkpoint = next_checkpoint(path)
+    checkpoint = next_checkpoint(path, ema_length)
+    prefix = f"{key}"
+    if step is not None and key != "optimizer":
+        prefix += f"_step{step:07d}"
+    if ema_length is not None and key != "optimizer":
+        prefix += f"_emalength{ema_length:.2f}"
+    name = f"{prefix}_{checkpoint:03d}"
     if key == "lora_checkpoint":
-        model.save_pretrained(os.path.join(path, f"{key}_{checkpoint:03d}"))
+        model.save_pretrained(os.path.join(path, name))
     else:
-        torch.save(model.state_dict(), os.path.join(path, f"{key}_{checkpoint:03d}.pt"))
-    print(f"Saved {key} {checkpoint} to {path}")
+        torch.save(model.state_dict(), os.path.join(path, f"{name}.pt"))
+    print(f"Saved {name} in {path}")
  
 
-def save_hyperparameters(hyperparameters: dict, path: str, key: str = "model_hparams"):
+def save_hyperparameters(hyperparameters: dict, path: str, key: str = "hyperparameters"):
     """
     Utility function to save the hyperparameters of a model to a standard file.
     """
@@ -95,11 +134,14 @@ def save_hyperparameters(hyperparameters: dict, path: str, key: str = "model_hpa
         print(f"Saved {key} to {path}")
 
 
-def load_hyperparameters(path: str, key: str = "model_hparams") -> dict:
+def load_hyperparameters(path: str, key: str = "hyperparameters") -> dict:
     """
     Utility function to load the hyperparameters of a model from a standard file.
     """
     file = os.path.join(path, f"{key}.json")
+    if not os.path.isfile(file):
+        # Backward compatibility
+        file = os.path.join(path, f"model_hparams.json")
     if os.path.isfile(file):
         with open(file, "r") as f:
             hparams = json.load(f)
@@ -108,30 +150,29 @@ def load_hyperparameters(path: str, key: str = "model_hparams") -> dict:
         raise FileNotFoundError(f"Could not find hyperparameters in {path}.")
 
 
-def remove_oldest_checkpoint(path: str, models_to_keep: int = 5):
+def remove_oldest_checkpoint(path: str, models_to_keep: int):
     """
-    Utility function to clean up old checkpoints in a directory.
-    This utility will delete the oldest checkpoints and their optimizer states.
+    Utility to delete the oldest checkpoints and their optimizer states.
     """
+    pattern = "*checkpoint*"
     if models_to_keep:
-        paths = sorted(glob.glob(os.path.join(path, "*checkpoint*")), key=checkpoint_number)
+        paths = sorted(glob.glob(os.path.join(path, pattern)), key=checkpoint_number)
         checkpoints = [checkpoint_number(os.path.split(path)[-1]) for path in paths]
-        if len(paths) > models_to_keep:
+        ema_lengths = set([ema_length_from_path(path) for path in paths]) # Remove checkpoints corresponding to different EMA lengths
+        if len(paths) > len(ema_lengths) * models_to_keep:
             # Clean up oldest models
-            path_to_remove = paths[0]
-            if os.path.isfile(path_to_remove):
-                os.remove(path_to_remove)
-            # Handle case (e.g. LoRA) where checkpoint is a directory
-            elif os.path.isdir(path_to_remove):
-                shutil.rmtree(path_to_remove)
+            paths_to_remove = paths[:len(ema_lengths)]
+            for path_to_remove in paths_to_remove:
+                if os.path.isfile(path_to_remove):
+                    os.remove(path_to_remove)
+                # Handle case (e.g. LoRA) where checkpoint is a directory
+                elif os.path.isdir(path_to_remove):
+                    shutil.rmtree(path_to_remove)
             # remove associated optimizer
             opt_path = os.path.join(path, "optimizer_{:03d}.pt".format(checkpoints[0]))
             if os.path.exists(opt_path):
                 os.remove(opt_path)
-            # # remove associated scalar net
-            # scalar_path = os.path.join(path, "scalar_net_{:03d}.pt".format(checkpoints[0]))
-            # if os.path.exists(scalar_path):
-                # os.remove(scalar_path)
+
 
 def load_sbm_state(sbm: "ScoreModel", path: str, device=DEVICE):
     """
@@ -148,19 +189,41 @@ def load_sbm_state(sbm: "ScoreModel", path: str, device=DEVICE):
             print(e)
             raise KeyError(f"Could not load state of model from {path}. Make sure you are loading the correct model.")
 
+
 def load_optimizer_state(optimizer: torch.optim.Optimizer, path: str, raise_error: bool = True, device=DEVICE):
     try:
-        optimizer.load_state_dict(torch.load(path, map_location=device, weights_only=True))
+        optimizer.load_state_dict(torch.load(path, map_location=device, weights_only=False))
     except (KeyError, RuntimeError) as e:
         if raise_error:
             print(e)
         maybe_raise_error(f"Could not load state of the optimizer from {path}.", raise_error, error_type=KeyError)
 
+
 def load_lora_state(lora_sbm: "LoRAScoreModel", path: str, device=DEVICE):
     lora_sbm.lora_net = PeftModel.from_pretrained(copy.deepcopy(lora_sbm.net), path, is_trainable=True)
 
+
 # def load_scalar_net(posterior_sbm: "LoRAPosteriorScoreModel", path: str):
     # posterior_sbm.scalar_net.load_state_dict(torch.load(path, map_location=posterior_sbm.device))
+
+def update_loss_file(path: str, checkpoint: int, step: int, loss: float, time_per_step: float):
+    # Save this logic here since we need it when loading the global step
+    with open(os.path.join(path, "loss.txt"), "a") as f:
+        f.write(f"{checkpoint} {step} {loss} {time_per_step}\n")
+
+
+def load_global_step(path: str, checkpoint: int) -> int:
+    # Get the step from the loss.txt if it exists
+    file = os.path.join(path, f"loss.txt")
+    if os.path.isfile(file):
+        with open(file, "r") as f:
+            lines = f.readlines()
+        for line in reversed(lines):
+            ch, step, loss, time_per_step = line.split()
+            if int(ch) == checkpoint:
+                return int(step)
+    return 0
+    
         
 def load_checkpoint(
         model: Module,
@@ -194,12 +257,13 @@ def load_checkpoint(
         else: # If no directory is found, don't do anything. This is useful for initialization of Base.
             return
     name = os.path.split(path)[-1]
+    pattern = f"*{key}*"
     # Collect all checkpoint paths sorted by the checkpoint number (*_001.pt, *_002.pt, ...)
-    paths = sorted(glob.glob(os.path.join(path, f"{key}*")), key=checkpoint_number)
+    paths = sorted(glob.glob(os.path.join(path, pattern)), key=checkpoint_number)
     checkpoints = [checkpoint_number(os.path.split(path)[-1]) for path in paths]
     if checkpoint and checkpoint not in checkpoints:
         # Make sure the requested checkpoint exists
-        maybe_raise_error(f"{key} {checkpoint} not found in directory {path}.", raise_error)
+        maybe_raise_error(f"No file with pattern {pattern} found in {path}.", raise_error)
         checkpoint = None # Overwrite to load the last checkpoint
     
     # Refactor to use setattr for more generality or just returns the net.
@@ -226,14 +290,14 @@ def load_checkpoint(
         print(f"Loaded {key} {checkpoint} from {name}.")
         return checkpoint
     else:
-        maybe_raise_error(f"No {key} found in {path}")
+        maybe_raise_error(f"Pattern {pattern} not found in {path}")
         return None
+
 
 def load_architecture(
         path: Optional[str] = None,
         net: Optional[str] = None,
         device=DEVICE,
-        hparams_filename="model_hparams",
         **hyperparameters
         ) -> Tuple[Module, dict]:
     """
@@ -250,7 +314,7 @@ def load_architecture(
         if not os.path.isdir(path):
             raise FileNotFoundError(f"Directory {path} does not exist. "
                                      "Please make sure to provide a valid path to the checkpoint directory.")
-        hparams = load_hyperparameters(path, key=hparams_filename)
+        hparams = load_hyperparameters(path)
         hyperparameters.update(hparams)
         net = hyperparameters.get("model_architecture", "ncsnpp")
     
@@ -267,6 +331,9 @@ def load_architecture(
         elif net.lower() == "encoder":
             from score_models import Encoder
             net = Encoder(**hyperparameters).to(device)
+        elif net.lower() == "edmv2net":
+            from score_models import EDMv2Net
+            net = EDMv2Net(**hyperparameters).to(device)
         else:
             raise ValueError(f"Architecture {net} not recognized.")
     else:
@@ -277,13 +344,13 @@ def load_architecture(
         hyperparameters["model_architecture"] = net.__class__.__name__
 
     if path:
-        print(f"Loaded model architecture {net.__class__.__name__} from {os.path.split(path)[-1]}.")
+        print(f"Loaded architecture {net.__class__.__name__} from {os.path.split(path)[-1]}.")
     else:
-        print(f"Loaded model architecture {net.__class__.__name__} from hyperparameters.")
+        print(f"Loaded architecture {net.__class__.__name__} from hyperparameters.")
     return net, hyperparameters
 
 
-def load_sde(sde: Optional[Literal["ve", "vp", "tsve"]] = None, **kwargs) -> Tuple["SDE", dict]:
+def load_sde(sde: Optional[Literal["ve", "vp", "cosvp", "tsve"]] = None, **kwargs) -> Tuple["SDE", dict]:
     if sde is None:
         if "sde" not in kwargs.keys():
             # Some sane defaults for quick use of VE or VP
@@ -331,9 +398,16 @@ def load_sde(sde: Optional[Literal["ve", "vp", "tsve"]] = None, **kwargs) -> Tup
                 "beta_max": kwargs.get("beta_max", VPSDE.__init__.__defaults__[1]),
                 "T": kwargs.get("T", VPSDE.__init__.__defaults__[2]),
                 "epsilon": kwargs.get("epsilon", VPSDE.__init__.__defaults__[3]),
-                "schedule": kwargs.get("schedule", VPSDE.__init__.__defaults__[4])
                 }
         sde = VPSDE(**sde_hyperparameters)
+    
+    elif sde.lower() == "cosvp":
+        from score_models.sde import CosineVPSDE
+        sde_hyperparameters = {
+                "beta_max": kwargs.get("beta_max", CosineVPSDE.__init__.__defaults__[0]),
+                "T": kwargs.get("T", CosineVPSDE.__init__.__defaults__[1]),
+                "epsilon": kwargs.get("epsilon", CosineVPSDE.__init__.__defaults__[2]),
+                }
     
     elif sde.lower() == "tsve":
         if "sigma_min" not in kwargs.keys() or "sigma_max" not in kwargs.keys():

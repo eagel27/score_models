@@ -3,8 +3,8 @@ from typing import Union, Callable
 import torch
 from torch import Tensor
 
-from ..sde import SDE
 from . import ScoreModel
+from ..sde import SDE
 from ..architectures import NullNet
 
 
@@ -73,3 +73,12 @@ class InterpolatedScoreModel(ScoreModel):
         if beta.item() < (1 - self.epsilon):
             score += self.lowt_model(t, x, *args, **kwargs) * (1.0 - beta)
         return score
+    
+    def reparametrized_score(self, t: Tensor, x: Tensor, *args, **kwargs):
+        raise RuntimeError("Reparametrized score is not defined for Interpolated models.")
+    
+    def save(self, *args, **kwargs):
+        raise NotImplementedError("Interpolated models cannot yet be saved.")
+    
+    def load(self, *args, **kwargs):
+        raise NotImplementedError("Interpolated models cannot yet be loaded.")

@@ -1,12 +1,15 @@
+"""
+Old implementation of the Euler-Maruyama method for sampling from SDEs.
+"""
 from typing import Union, Optional, Callable
 
-import torch
-import numpy as np
 from torch import Tensor
 from tqdm import tqdm
-
 from .sde import SDE
 from ..utils import DEVICE
+import torch
+import numpy as np
+
 
 __all__ = ["euler_maruyama_method"]
 
