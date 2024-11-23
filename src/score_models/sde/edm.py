@@ -16,6 +16,7 @@ class EDMSDE(SDE):
         self,
         sigma_min: float = 1e-2,
         sigma_max: float = 100,
+        sigma_data: float = 0.5,
         rho: int = 7, # Karras et al. recommended value for sampling. Set to rho=3 to minimize errors at low temperatures.
         T: float = 1.0,
         epsilon: float = 0,
@@ -35,8 +36,8 @@ class EDMSDE(SDE):
         EDM column, time-steps row. Our implementation has sigma(t) and time steps interchanged.
         Also, our schedule is such that t=0 corresponds to sigma_min instead of sigma_max (reverse of Karras et al. 2022).
         """
-        sigma_diff = self.sigma_max**(1/rho) - self.sigma_min**(1/rho)
-        return (self.sigma_min**(1/rho) + (t/self.T) * sigma_diff)**rho
+        sigma_diff = self.sigma_max**(1/rho) - self.sigma_min**(1/self.rho)
+        return (self.sigma_min**(1/rho) + (t/self.T) * sigma_diff)**self.rho
         
     def diffusion(self, t: Tensor, x: Tensor) -> Tensor:
         B, *D = x.shape
@@ -48,12 +49,22 @@ class EDMSDE(SDE):
     def drift(self, t: Tensor, x: Tensor) -> Tensor:
         return torch.zeros_like(x)
 
-    def sigma_inverse(self, sigma: Tensor) -> Tensor:
-        sigma_diff = self.sigma_max**(1/rho) - self.sigma_min**(1/rho)
-        return (sigma**(1/rho) - self.sigma_min**(1/rho)) * self.T / sigma_diff
-
     def prior(self, shape, mean=None, device=DEVICE):
         if mean is None:
             mean = torch.zeros(shape).to(device)
         return Independent(Normal(loc=mean, scale=self.sigma_max, validate_args=False), len(shape))
+
+    def sigma_inverse(self, sigma: Tensor) -> Tensor:
+        rho = self.rho
+        sigma_diff = self.sigma_max**(1/rho) - self.sigma_min**(1/rho)
+        return (sigma**(1/rho) - self.sigma_min**(1/rho)) * self.T / sigma_diff
+
+    def c_skip(self, t: Tensor) -> Tensor:
+        return self.sigma_data**2 / (self.sigma(t)**2 + self.sigma_data**2)
+
+    def c_out(self, t: Tensor) -> Tensor:
+        return self.sigma_data * self.sigma(t) / (self.sigma(t)**2 + self.sigma_data**2)**(1/2)
+    
+    def c_in(self, t: Tensor) -> Tensor:
+        return 1 / (self.sigma(t)**2 + self.sigma_data**2)**(1/2)
 
