@@ -240,6 +240,28 @@ class UNet(torch.nn.Module):
             **block_kwargs,                           # Arguments for Block.
     ):
         super().__init__()
+        default_block_kwargs = { # Global hyperparameter, we skip the layer specific ones
+                "resample_filter": [1,1],
+                "channels_per_head": 64,
+                "dropout": 0,
+                "res_balance": 0.3,
+                "attn_balance": 0.3,
+                "clip_act": None,
+                }
+        default_block_kwargs.update(block_kwargs)
+        self.hyperparameters = {
+            "pixels": pixels,
+            "channels": channels,
+            "nf": nf,
+            "ch_mult": ch_mult,
+            "num_blocks": num_blocks,
+            "attn_resolutions": attn_resolutions,
+            "label_balance": label_balance,
+            "concat_balance": concat_balance,
+            "fourier_scale": fourier_scale,
+            **default_block_kwargs
+        }
+
         cblock = [nf * m for m in ch_mult]
         cnoise = cblock[0]
         cemb = max(cblock)
@@ -320,20 +342,21 @@ class EDMv2Net(torch.nn.Module):
             pixels: int,                 # Image resolution.
             channels: int,               # Image channels.
             logvar_channels: int = 128,  # Intermediate dimensionality for uncertainty estimation.
-            **unet_kwargs,               # Keyword arguments for UNet.
+            **kwargs,               # Keyword arguments for UNet.
     ):
         super().__init__()
         self.pixels = pixels
         self.channels = channels
-        self.unet = UNet(pixels=pixels, channels=channels, **unet_kwargs)
+        self.unet = UNet(pixels=pixels, channels=channels, **kwargs)
         self.logvar_fourier = MPFourier(logvar_channels)
         self.logvar_linear = MPConv(logvar_channels, 1, kernel=[])
         
+        kwargs.update(self.unet.hyperparameters)
         self.hyperparameters = {
             "pixels": pixels,
             "channels": channels,
             "logvar_channels": logvar_channels,
-            **unet_kwargs,
+            **kwargs
         }
 
     # kwargs need to be return_logvar, assumed to be the case in dsm.py
