@@ -5,7 +5,7 @@ from typing import Union, Optional, Callable
 
 from torch import Tensor
 from tqdm import tqdm
-from .sde import SDE
+from ..sde import SDE
 from ..utils import DEVICE
 import torch
 import numpy as np
