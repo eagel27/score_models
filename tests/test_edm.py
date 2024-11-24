@@ -49,7 +49,7 @@ def test_edm_net(tmp_path):
     assert torch.allclose(out, out2)
 
 
-def test_adaptive_weights():
+def test_adaptive_loss():
     D = 2
     B = 10
     net = MLPv2(D)
@@ -70,7 +70,7 @@ def test_adaptive_weights():
     # Check that the loss works correctly when using the uncertainty
     loss = model.loss(x) # Baseline loss
     # Check that the loss changes when we use the uncertainty as a way to check if it is applied
-    model.adaptive_weights = True # When calling fit, this varible triggers the use of the uncertainty layer
+    model.adaptive_loss = True # When calling fit, this varible triggers the use of the uncertainty layer
     loss2 = model.loss(x)
     assert torch.all(loss != loss2)
     

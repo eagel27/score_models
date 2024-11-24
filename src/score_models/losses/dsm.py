@@ -35,7 +35,7 @@ def dsm(model: "ScoreModel", x: Tensor, *args: list[Tensor], **kwargs):
     epsilon_theta = model.reparametrized_score(t, xt, *args)                       # epsilon_theta(t, x) = sigma(t) * score(t, x)
     return ((epsilon_theta + z)**2).sum() / (2 * B)
 
-def karras_dsm(model: "ScoreModel", x: Tensor, *args: list[Tensor], adaptive_weigts: bool = False, **kwargs):
+def karras_dsm(model: "ScoreModel", x: Tensor, *args: list[Tensor], adaptive_loss: bool = False, **kwargs):
     """
     Desnoing Score Matching loss used by Tero Karras in his EDM formulation. 
     The idea is to use the Tweedie formula to train the score, and define 
@@ -57,7 +57,7 @@ def karras_dsm(model: "ScoreModel", x: Tensor, *args: list[Tensor], adaptive_wei
     xt = mu * x + sigma * z                                                        # xt ~ p(xt | x0)
     
     # EDM Denoising loss, with weight factor taken into account
-    if adaptive_weigts:
+    if adaptive_loss:
         F_theta, u = model.reparametrized_score(t, xt, *args, return_logvar=True)
         u = u.view(-1, *[1]*len(D))
     else:

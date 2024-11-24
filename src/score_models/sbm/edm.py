@@ -40,8 +40,8 @@ class EDMScoreModel(ScoreModel):
         self.hyperparameters["formulation"] = "edm"
 
     def loss(self, x, *args) -> Tensor:
-        if hasattr(self, "adaptive_weights"):
-            return karras_dsm(self, x, *args, adaptive_weights=self.adaptive_weights)
+        if hasattr(self, "adaptive_loss"):
+            return karras_dsm(self, x, *args, adaptive_loss=self.adaptive_loss)
         else:
             return karras_dsm(self, x, *args)
     
@@ -114,7 +114,7 @@ class EDMScoreModel(ScoreModel):
             noise_level_distribution: Literal["uniform", "normal"] = "uniform",
             log_sigma_mean: float = -1.2,
             log_sigma_std: float = 1.2,
-            adaptive_weights: bool = False,
+            adaptive_loss: bool = False,
             **kwargs
             ):
         if sample_noise_level_function is None:
@@ -132,9 +132,9 @@ class EDMScoreModel(ScoreModel):
             print(f"Using custom function {sample_noise_level_function.__name__} to sample nosie level ") 
             self.sample_noise_level = sample_noise_level_function
         
-        self.adaptive_weights = adaptive_weights
-        if adaptive_weights:
+        self.adaptive_loss = adaptive_loss
+        if adaptive_loss:
             check_that_net_can_return_logvar(self.net.__class__.__name__)
-            print("Using adaptive weights of the noise levels in the DSM loss function.")
+            print("Using adaptive DSM loss with noise level uncertainty estimation.")
         return super().fit(*args, **kwargs)
 
