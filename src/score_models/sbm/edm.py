@@ -97,7 +97,7 @@ class EDMScoreModel(ScoreModel):
         This is the recommended setting for the EDM formulation.
         """
         log_sigma = torch.randn(B, device=self.device) * self.log_sigma_std + self.log_sigma_mean
-        sigma = torch.exp(log_sigma)
+        sigma = 10**log_sigma
         t = self.sde.sigma_inverse(sigma)
         return t
 
@@ -122,14 +122,14 @@ class EDMScoreModel(ScoreModel):
                 print("Samplng noise level from a Uniform in [epsilon, T]")
                 self.sample_noise_level = self._uniform_noise_level_distribution
             elif noise_level_distribution == "normal":
-                print(f"Sampling noise level from log-Normal with mean log sigma = {log_sigma_mean} and standard deviation {log_sigma_std}")
+                print(f"Sampling noise level from log-Normal with mean log sigma = {log_sigma_mean} and standard deviation {log_sigma_std} (base 10)")
                 self.log_sigma_mean = log_sigma_mean
                 self.log_sigma_std = log_sigma_std
                 self.sample_noise_level = self._normal_noise_level_distribution
             else:
                 raise ValueError(f"Sampling distribution {noise_level_distribution} is not recognized. Choose between 'uniform' and 'normal'.")
         else:
-            print(f"Using custom function {sample_noise_level_function.__name__} to sample nosie level ") 
+            print(f"Using custom function {sample_noise_level_function.__name__} to sample noise level ") 
             self.sample_noise_level = sample_noise_level_function
         
         self.adaptive_loss = adaptive_loss
