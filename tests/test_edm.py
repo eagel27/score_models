@@ -79,3 +79,29 @@ def test_adaptive_loss():
     model = ScoreModel(net, "vp", formulation="edm")
     with pytest.raises(ValueError):
         model(t, x, return_logvar=True)
+
+
+def test_conditional_architecture():
+    P = 8
+    C = 1
+    B = 10
+    E = 5
+    net = EDMv2Net(
+            conditions=("time_discrete",), 
+            condition_embeddings=(E,), 
+            pixels=P, 
+            channels=C, 
+            nf=8, 
+            ch_mult=(1, 1, 1, 1)
+            )
+    
+    x = torch.randn(B, C, P, P)
+    t = torch.rand(B)
+    condition = torch.randint(0, E, (B,))
+    out = net(t, x, condition)
+    assert tuple(out.shape) == (B, C, P, P)
+    
+    # Make sure net has a conditional branch
+    assert hasattr(net.unet, "conditioned")
+    assert net.unet.conditioned
+    assert hasattr(net.unet, "conditional_branch")

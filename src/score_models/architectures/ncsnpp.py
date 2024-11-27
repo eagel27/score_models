@@ -14,7 +14,6 @@ from ..layers import (
     DownsampleLayer,
     Combine,
     conv3x3,
-    PositionalEncoding,
 )
 from ..utils import get_activation
 from ..definitions import default_init

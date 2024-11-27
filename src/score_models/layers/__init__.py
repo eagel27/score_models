@@ -11,3 +11,5 @@ from .resnet_block_biggan import *
 from .style_gan_conv import *
 from .spectral_normalization import *
 from .upsample import *
+from .edm_mp_layers import *
+from .edm_resample import *
