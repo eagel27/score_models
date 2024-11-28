@@ -53,7 +53,7 @@ class UNet(torch.nn.Module):
         conditions: Optional[Literal["discrete", "continuous", "vector", "tensor"]] = None,
         condition_channels: Optional[tuple[int]] = None,
         condition_embeddings: Optional[tuple[int]] = None,
-        condition_balance: float = 0.5,
+        condition_balance: float        = 0.5,
         **block_kwargs,
     ):
         super().__init__()

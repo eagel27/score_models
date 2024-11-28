@@ -117,7 +117,7 @@ class Block(torch.nn.Module):
         dropout: float                               = 0,        # Dropout probability.
         res_balance: float                           = 0.3,      # Balance between main branch (0) and residual branch (1).
         attn_balance: float                          = 0.3,      # Balance between main branch (0) and self-attention (1).
-        clip_act: Optional[float]                    = None,     # Clip output activations. None = do not clip. (Karras et al. 2023 used clip_act=256)
+        clip_act: Optional[float]                    = 256,      # Clip output activations. None = do not clip. (Karras et al. 2023 used clip_act=256)
         **kwargs, 
     ):
         super().__init__()
