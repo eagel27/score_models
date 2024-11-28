@@ -183,6 +183,7 @@ class Base(Module, ABC):
         learning_rate: float = 1e-3,
         learning_rate_decay: Optional[int] = None, # Number of steps to decay the learning rate
         clip: float = 1.,                       # Gradient clipping
+        force_finite: bool = True,              # Force finite gradients
         warmup: int = 0,                        # Number of steps before reaching the target learning rate (good to let Adam warm up)
         ema_decay: Optional[float] = None,      # Traditional EMA
         ema_lengths: Optional[Union[float, tuple]] = 0.13, # Karras EMA 
@@ -217,6 +218,7 @@ class Base(Module, ABC):
             learning_rate=learning_rate,
             learning_rate_decay=learning_rate_decay,
             clip=clip,
+            force_finite=force_finite,
             warmup=warmup,
             ema_lengths=ema_lengths,
             ema_decay=ema_decay,

@@ -50,6 +50,7 @@ class Trainer:
         soft_reset_every: Optional[int] = None,    # Number of epochs before resetting the online model (and optimizer) to EMA model (ala Hare and Tortoise)
         update_ema_every: int = 1,                 # Update for the EMA
         clip: float = 1.,
+        force_finite: bool = False,
         warmup: int = 0,
         shuffle: bool = False,
         iterations_per_epoch: Optional[int] = None,
@@ -62,7 +63,6 @@ class Trainer:
         seed: Optional[int] = None,
         optimizer: Optional[torch.optim.Optimizer] = None,
         reload_optimizer: bool = True,
-        force_finite: bool = False,
         ): 
         # Model
         self.model = model
@@ -259,7 +259,7 @@ class Trainer:
             if self.clip > 0:
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.clip)
             if self.force_finite:
-                for param in net.parameters():
+                for param in self.model.parameters():
                     if param.grad is not None:
                         torch.nan_to_num(param.grad, nan=0, posinf=0, neginf=0, out=param.grad)
             # Update
