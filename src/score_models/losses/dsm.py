@@ -67,7 +67,7 @@ def karras_dsm(model: "ScoreModel", x: Tensor, *args: list[Tensor], adaptive_los
     c_skip = model.sde.c_skip(t).view(B, *[1]*len(D))
     effective_score = (x - c_skip * xt) / c_out
     loss = (F_theta - effective_score)**2
-    return (torch.exp(u) * loss + u).sum() / (2 * B)
+    return (torch.exp(-u) * loss + u).sum() / (2 * B)
 
 def denoising_score_matching(
         model: "ScoreModel", 

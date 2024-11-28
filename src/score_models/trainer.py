@@ -62,6 +62,7 @@ class Trainer:
         seed: Optional[int] = None,
         optimizer: Optional[torch.optim.Optimizer] = None,
         reload_optimizer: bool = True,
+        force_finite: bool = False,
         ): 
         # Model
         self.model = model
@@ -69,6 +70,7 @@ class Trainer:
         
         # Gradient clipping
         self.clip = clip
+        self.force_finite = force_finite # Force NaN and inf values to 0 in the gradients to prevent loss spikes from ruining the training
         
         # Dataset
         if batch_size is not None:
@@ -253,8 +255,14 @@ class Trainer:
             self.optimizer.zero_grad()
             loss = self.model.loss(x, *args)
             loss.backward()
+            # Regularization
             if self.clip > 0:
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.clip)
+            if self.force_finite:
+                for param in net.parameters():
+                    if param.grad is not None:
+                        torch.nan_to_num(param.grad, nan=0, posinf=0, neginf=0, out=param.grad)
+            # Update
             self.optimizer.step()
             for ema in self.emas:
                 ema.update()

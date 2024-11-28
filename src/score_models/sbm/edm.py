@@ -112,8 +112,8 @@ class EDMScoreModel(ScoreModel):
             *args,
             sample_noise_level_function: Optional[Callable] = None,
             noise_level_distribution: Literal["uniform", "normal"] = "uniform",
-            log_sigma_mean: float = -1.2,
-            log_sigma_std: float = 1.2,
+            log_sigma_mean: Optional[float] = None,
+            log_sigma_std: Optional[float] = None,
             adaptive_loss: bool = False,
             **kwargs
             ):
@@ -122,6 +122,8 @@ class EDMScoreModel(ScoreModel):
                 print("Samplng noise level from a Uniform in [epsilon, T]")
                 self.sample_noise_level = self._uniform_noise_level_distribution
             elif noise_level_distribution == "normal":
+                if log_sigma_mean is None or log_sigma_std is None:
+                    raise ValueError("You must provide log_sigma_mean and log_sigma_std when using normal distribution, in base 10.")
                 print(f"Sampling noise level from log-Normal with mean log sigma = {log_sigma_mean} and standard deviation {log_sigma_std} (base 10)")
                 self.log_sigma_mean = log_sigma_mean
                 self.log_sigma_std = log_sigma_std
