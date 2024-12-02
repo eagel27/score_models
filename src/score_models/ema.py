@@ -39,7 +39,7 @@ class EMA:
     and the Switch EMA paper (https://arxiv.org/abs/2402.09240).
     
     For traditional EMA we employ a warmup strategy to avoid putting weight on the initial random network. 
-    This idea is taken from lucidrains/ema_pytorch implementation. Shoutout also to favel/torch_ema.
+    This idea is taken from lucidrains/ema_pytorch implementation. See also favel/torch_ema for a useful implementation.
     """
     def __init__(
             self,
@@ -78,19 +78,21 @@ class EMA:
         for buffer in self.ema_model.buffers(): # e.g. GroupNorm's running_mean
             buffer.requires_grad_(False)
     
-    def beta(self, step: int):
+    @property
+    def beta(self):
         """ EMA decay parameter."""
-        return self._beta(step)
+        return self._beta()
     
-    def _karras_beta(self, step: int):
+    def _karras_beta(self):
         """ Karras EMA. """
         dt = self.update_every
-        return (1 - dt/step) ** self.gamma
+        t = self.step
+        return (1 - dt/t) ** (self.gamma + 1)
     
-    def _classical_beta(self, step: int):
+    def _classical_beta(self):
         """ Classical EMA with warmup schedule."""
-        step = max(0, step - self.start_update_after_step)
-        value = 1 - (1 + step / self.inverse_gamma) ** (-self.power)
+        step = max(0, self.step - self.start_update_after_step)
+        value = 1 - (1 + self.step / self.inverse_gamma) ** (-self.power)
         return min(max(value, 0.5), self.target_beta)
 
     def update(self):
@@ -99,11 +101,10 @@ class EMA:
         """
         self.step += 1
         if self.step % self.update_every == 0 and self.step > self.start_update_after_step:
-            beta = self.beta(self.step)
             with torch.no_grad():
                 # Update parameters
                 for ema_param, online_param in zip(self.ema_model.parameters(), self.online_model.parameters()):
-                    ema_param.copy_(beta * ema_param + (1 - beta) * online_param)
+                    ema_param.copy_(self.beta * ema_param + (1 - self.beta) * online_param)
                 
                 # Update buffers
                 for ema_buffer, online_buffer in zip(self.ema_model.buffers(), self.online_model.buffers()):

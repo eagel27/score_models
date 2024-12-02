@@ -92,6 +92,7 @@ class LoRAScoreModel(ScoreModel):
             create_path: bool = True,
             step: Optional[int] = None, # Iteration number
             ema_length: Optional[float] = None, # Relative EMA length scale
+            **kwargs
             ):
         """
         Update the save method to save only one copy of the base SBM alongside the LoRA checkpoints.
@@ -101,13 +102,13 @@ class LoRAScoreModel(ScoreModel):
             # Save the base ScoreModel only once
             base_sbm_path = os.path.join(path, "base_sbm")
             if not os.path.exists(base_sbm_path):
-                super().save(base_sbm_path, create_path=True)
+                super().save(base_sbm_path, create_path=True, **kwargs)
             
             # Save the optimizer associated with them
             if optimizer: # Save optimizer first since checkpoint number is inferred from number of checkpoint files 
-                save_checkpoint(model=optimizer, path=path, key="optimizer", create_path=create_path)
+                save_checkpoint(model=optimizer, path=path, key="optimizer", create_path=create_path, **kwargs)
             # Save the LoRA adapters only (takes less space than saving the whole merged model)
-            save_checkpoint(model=self.lora_net, path=path, key="lora_checkpoint", create_path=create_path, step=step, ema_length=ema_length)
+            save_checkpoint(model=self.lora_net, path=path, key="lora_checkpoint", create_path=create_path, step=step, ema_length=ema_length, **kwargs)
             self.save_hyperparameters(path)
         else:
             raise ValueError("No path provided to save the model. Please provide a valid path or initialize the model with a path.")
@@ -116,7 +117,8 @@ class LoRAScoreModel(ScoreModel):
             self,
             checkpoint: Optional[int] = None,
             ema_length: Optional[float] = None,
-            raise_error: bool = True
+            raise_error: bool = True,
+            **kwargs
             ):
         if self.path is None:
             raise ValueError("A checkpoint can only be loaded if the model is instantiated with a path, e.g. model = ScoreModel(path='path/to/checkpoint').")
@@ -129,7 +131,7 @@ class LoRAScoreModel(ScoreModel):
             param.requires_grad = False
         
         # Load LoRA weights
-        self.loaded_checkpoint = load_checkpoint(model=self, checkpoint=checkpoint, path=self.path, key="lora_checkpoint", raise_error=raise_error)
+        self.loaded_checkpoint = load_checkpoint(model=self, checkpoint=checkpoint, path=self.path, key="lora_checkpoint", raise_error=raise_error, **kwargs)
         print(f"Loaded LoRA weights with rank {self.hyperparameters['lora_rank']}")
         self.lora_net.print_trainable_parameters()
     

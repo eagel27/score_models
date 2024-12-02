@@ -402,7 +402,8 @@ def test_backward_compatibility_optimizer_state(tmp_path, capsys):
             batch_size=B,
             epochs=E,
             checkpoint_every=1,
-            models_to_keep=1
+            models_to_keep=1,
+            verbose=1
             )
     # Check stdout for the print statement declaring we resumed from a previous checkpoint for the optimizer
     captured = capsys.readouterr()

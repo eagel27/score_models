@@ -5,7 +5,7 @@ import glob
 
 from .utils import DEVICE
 from .save_load_utils import (
-        load_architecture,
+        initialize_architecture,
         load_checkpoint,
         checkpoint_number,
         ema_length_from_path,
@@ -47,7 +47,7 @@ class PostHocEMA:
         self.ema_lengths = ema_lengths_from_path(path)
         self.device = device
         self.validate_checkpoints()
-        self.ema_model, self.hyperparameters = load_architecture(path, device=device)
+        self.ema_model, self.hyperparameters = initialize_architecture(path, device=device, verbose=1)
         for p in self.ema_model.parameters():
             p.requires_grad = False
             p.zero_()
@@ -67,7 +67,7 @@ class PostHocEMA:
                 raise ValueError("Different number of checkpoints found for the different ema_length")
 
     def zero_model(self):
-        model, _ = load_architecture(self.path, device=self.device) # Random weights
+        model, _ = initialize_architecture(self.path, device=self.device) # Random weights
         for p in model.parameters():
             p.requires_grad = False # Freeze the model
             p.zero_()

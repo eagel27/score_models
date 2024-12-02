@@ -10,13 +10,13 @@ from ..save_load_utils import (
     save_hyperparameters,
     load_hyperparameters,
     load_checkpoint,
-    load_architecture,
-    load_sde,
+    initialize_architecture,
+    initialize_sde,
 )
 from ..utils import DEVICE
 from ..sde import SDE
 from ..trainer import Trainer
-from ..post_hoc_ema import PostHocEMA, ema_lengths_from_path
+from ..phema import PostHocEMA, ema_lengths_from_path
 
 
 class Base(Module, ABC):
@@ -53,8 +53,8 @@ class Base(Module, ABC):
         # First load architecture and hyperparameters
         self.path = path
         if net is None or isinstance(net, str):
-            self.net, self.hyperparameters = load_architecture(
-                path, net=net, device=device, checkpoint=checkpoint, **hyperparameters
+            self.net, self.hyperparameters = initialize_architecture(
+                path, net=net, device=device, checkpoint=checkpoint, verbose=0 if self.path else 0, **hyperparameters
             )
         else:
             self.net = net
@@ -68,12 +68,12 @@ class Base(Module, ABC):
         else:
             if isinstance(sde, str):
                 self.hyperparameters["sde"] = sde
-            self.sde, sde_params = load_sde(**self.hyperparameters)
+            self.sde, sde_params = initialize_sde(**self.hyperparameters)
         self.hyperparameters.update(sde_params)  
         
         # Load the checkpoint (or a combination of them with PostHoc EMA)
         if self.path:
-            self.load(checkpoint, raise_error=False, ema_length=ema_length)
+            self.load(checkpoint, raise_error=False, ema_length=ema_length, verbose=1)
         else:
             self.loaded_checkpoint = None
         self.net.to(device)
@@ -86,9 +86,6 @@ class Base(Module, ABC):
         if "model_architecture" not in self.hyperparameters:
             self.hyperparameters["model_architecture"] = self.net.__class__.__name__.lower()
         self.model = self.net
-        # Print number of parameters
-        params = sum(p.numel() for p in self.parameters() if p.requires_grad)
-        print(f"{self.net.__class__.__name__} network has {params/1e6:.2f}M parameters.")
 
     @abstractmethod
     def forward(self, t, x, *args, **kwargs) -> Tensor: ...
@@ -103,6 +100,8 @@ class Base(Module, ABC):
         create_path: bool = True,
         step: Optional[int] = None, # Iteration number
         ema_length: Optional[float] = None, # Relative EMA length scale
+        verbose: int = 0,
+        **kwargs
     ):
         """
         Save the model checkpoint to the provided path or the path provided during initialization.
@@ -121,7 +120,7 @@ class Base(Module, ABC):
             )
         if optimizer:
             save_checkpoint(model=optimizer, path=path, key="optimizer", create_path=create_path)
-        save_checkpoint(model=self.net, path=path, key="checkpoint", create_path=create_path, step=step, ema_length=ema_length)
+        save_checkpoint(model=self.net, path=path, key="checkpoint", create_path=create_path, step=step, ema_length=ema_length, verbose=verbose)
         self.save_hyperparameters(path)
 
     def save_hyperparameters(self, path: Optional[str] = None):
@@ -136,7 +135,9 @@ class Base(Module, ABC):
             self, 
             checkpoint: Optional[int] = None, 
             ema_length: Optional[float] = None,
-            raise_error: bool = True
+            raise_error: bool = True,
+            verbose: int = 0,
+            **kwargs
             ):
         """
         Load a specific checkpoint from the model.
@@ -171,6 +172,7 @@ class Base(Module, ABC):
                 path=self.path,
                 key="checkpoint",
                 raise_error=raise_error,
+                verbose=verbose
             )
             self.reload_optimizer = True
         self.hyperparameters.update(self.net.hyperparameters)
@@ -201,6 +203,7 @@ class Base(Module, ABC):
         name_prefix: Optional[str] = None,
         seed: Optional[int] = None,
         reload_optimizer: bool = True,
+        verbose: int = 0,
         **kwargs
     ) -> list:
         # Backward compatibility
@@ -236,6 +239,7 @@ class Base(Module, ABC):
             seed=seed,
             shuffle=shuffle,
             reload_optimizer=self.reload_optimizer and reload_optimizer,
+            verbose=verbose,
         )
         losses = trainer.train()
         return losses

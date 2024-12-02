@@ -51,6 +51,7 @@ class MLPv2(nn.Module):
         )
         self.logvar_fourier = GaussianFourierProjection(width, scale=fourier_scale)
         self.logvar_linear = nn.Linear(width, 1)
+        self.hyperparameters = self.net.hyperparameters
 
     # kwargs need to be return_logvar, assumed to be the case in dsm.py
     def forward(self, t, x, *args, return_logvar=False, **kwargs):

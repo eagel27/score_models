@@ -67,7 +67,10 @@ class Trainer:
         seed: Optional[int] = None,
         optimizer: Optional[torch.optim.Optimizer] = None,
         reload_optimizer: bool = True,
+        verbose: int = 0,
         ): 
+        self.verbose = verbose
+        
         # Model
         self.model = model
         self.net = model.net # Neural network to train
@@ -226,13 +229,14 @@ class Trainer:
 
     def save_checkpoint(self, loss: float, time_per_step):
         """
-        Save model and optimizer if a path is provided. Then save loss and remove oldest checkpoints
-        when the number of checkpoints exceeds models_to_keep.
+        Save the EMA models and the checkpoint Also, save the loss and time_per_step information in the loss.txt file.
+        The global step is provided to the save method to be saved in the name of the file, alongside the ema_length. 
+        This is needed for PostHocEMA to synthetize a model from the list of checkpoints.
         """
         if self.path:
-            save_checkpoint(self.optimizer, self.path, key="optimizer", step=self.global_step)
+            save_checkpoint(self.optimizer, self.path, key="optimizer", step=self.global_step, verbose=self.verbose)
             for i, (ema_length, ema) in enumerate(zip(self.ema_lengths, self.emas)):
-                ema.ema_model.save(self.path, ema_length=ema_length, step=self.global_step)
+                ema.ema_model.save(self.path, ema_length=ema_length, step=self.global_step, verbose=self.verbose)
             checkpoint = last_checkpoint(self.path)
             update_loss_file(self.path, checkpoint, self.global_step, loss, time_per_step)
                 
@@ -284,7 +288,7 @@ class Trainer:
         time_per_step_avg /= self.iterations_per_epoch
         return cost, time_per_step_avg
         
-    def train(self, verbose=0) -> list:
+    def train(self) -> list:
         losses = []
         global_start = time.time()
         estimated_time_for_epoch = 0
@@ -303,12 +307,7 @@ class Trainer:
 
             # Logging
             losses.append(cost)
-            pbar.set_description(f"Epoch {epoch + 1:d} | Cost: {cost:.1e} |")
-            if verbose >= 2:
-                print(f"epoch {epoch} | cost {cost:.2e} | time per step {time_per_step_avg:.2e} s", flush=True)
-            elif verbose == 1:
-                if (epoch + 1) % self.checkpoints == 0:
-                    print(f"epoch {epoch} | cost {cost:.1e}", flush=True)
+            pbar.set_description(f"Epoch {epoch + 1:d} | Cost: {cost:.1e} | time per step {time_per_step_avg:.4f} s |")
             if np.isnan(cost):
                 print("Model exploded and returns NaN")
                 break

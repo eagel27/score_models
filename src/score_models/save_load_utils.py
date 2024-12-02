@@ -35,9 +35,6 @@ def last_checkpoint(path: str, ema_length: Optional[float] = None) -> int:
         if len(paths) > 0:
             return checkpoint_number(paths[-1])
         else:
-            if ema_length is not None:
-                # Some safeguard, remove when no longuer necessary, when a proper error message is provided.
-                print(f"No checkpoint found with EMA length {ema_length}.")
             return 0
     else:
         return 0
@@ -82,6 +79,8 @@ def save_checkpoint(
         key: Literal["checkpoint", "optimizer", "lora_checkpoint"] = "checkpoint",
         step: Optional[int] = None,
         ema_length: Optional[float] = None,
+        verbose: int = 0,
+        **kwargs
         ):
     """
     Utility function to save checkpoints of a model and its optimizer state. 
@@ -120,7 +119,8 @@ def save_checkpoint(
         model.save_pretrained(os.path.join(path, name))
     else:
         torch.save(model.state_dict(), os.path.join(path, f"{name}.pt"))
-    print(f"Saved {name} in {path}")
+    if verbose:
+        print(f"Saved {name} in {path}")
  
 
 def save_hyperparameters(hyperparameters: dict, path: str, key: str = "hyperparameters"):
@@ -212,16 +212,19 @@ def update_loss_file(path: str, checkpoint: int, step: int, loss: float, time_pe
         f.write(f"{checkpoint} {step} {loss} {time_per_step}\n")
 
 
-def load_global_step(path: str, checkpoint: int) -> int:
+def load_global_step(path: str, checkpoint: Optional[int] = None) -> int:
     # Get the step from the loss.txt if it exists
     file = os.path.join(path, f"loss.txt")
     if os.path.isfile(file):
         with open(file, "r") as f:
             lines = f.readlines()
-        for line in reversed(lines):
-            ch, step, loss, time_per_step = line.split()
-            if int(ch) == checkpoint:
-                return int(step)
+        if len(lines) > 1:
+            for line in reversed(lines[1:]):
+                ch, step, loss, time_per_step = line.split()
+                if checkpoint is None:
+                    return int(step)
+                elif int(ch) == checkpoint:
+                    return int(step)
     return 0
     
         
@@ -231,7 +234,9 @@ def load_checkpoint(
         checkpoint: Optional[int] = None,
         raise_error: bool = True,
         key: Literal["checkpoint", "optimizer", "lora_checkpoint"] = "checkpoint",
-        device=DEVICE
+        verbose: int = 0,
+        device=DEVICE,
+        **kwargs
         ):
     """
     Utility function to load the checkpoint of a model and its optimizer state. 
@@ -287,17 +292,19 @@ def load_checkpoint(
             index = np.argmax(checkpoints)
             checkpoint = checkpoints[index]
         loading_mecanism(model, paths[index], device=device)
-        print(f"Loaded {key} {checkpoint} from {name}.")
+        if verbose:
+            print(f"Loaded {key} {checkpoint} from {name}.")
         return checkpoint
     else:
         maybe_raise_error(f"Pattern {pattern} not found in {path}")
         return None
 
 
-def load_architecture(
+def initialize_architecture(
         path: Optional[str] = None,
         net: Optional[str] = None,
         device=DEVICE,
+        verbose: int = 0,
         **hyperparameters
         ) -> Tuple[Module, dict]:
     """
@@ -334,6 +341,9 @@ def load_architecture(
         elif net.lower() == "edmv2net":
             from score_models import EDMv2Net
             net = EDMv2Net(**hyperparameters).to(device)
+        elif net.lower() == "mlpv2":
+            from score_models import MLPv2
+            net = MLPv2(**hyperparameters).to(device)
         else:
             raise ValueError(f"Architecture {net} not recognized.")
     else:
@@ -343,14 +353,16 @@ def load_architecture(
     if "model_architecture" not in hyperparameters.keys():
         hyperparameters["model_architecture"] = net.__class__.__name__
 
-    if path:
-        print(f"Loaded architecture {net.__class__.__name__} from {os.path.split(path)[-1]}.")
-    else:
-        print(f"Loaded architecture {net.__class__.__name__} from hyperparameters.")
+    if verbose:
+        params = sum(p.numel() for p in net.parameters() if p.requires_grad)
+        if path:
+            print(f"Initialized architecture {net.__class__.__name__} model with {params/1e6:.2f}M parameters from {os.path.basename(path)}.")
+        else:
+            print(f"Initialized architecture {net.__class__.__name__} model with {params/1e6:.2f}M parameters.")
     return net, hyperparameters
 
 
-def load_sde(sde: Optional[Literal["ve", "vp", "cosvp", "tsve"]] = None, **kwargs) -> Tuple["SDE", dict]:
+def initialize_sde(sde: Optional[Literal["ve", "vp", "cosvp", "tsve"]] = None, **kwargs) -> Tuple["SDE", dict]:
     if sde is None:
         if "sde" not in kwargs.keys():
             # Some sane defaults for quick use of VE or VP

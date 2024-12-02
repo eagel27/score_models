@@ -22,7 +22,7 @@ def test_ema(decay):
         loss.backward()
         opt.step()
         ema.update()
-        print(ema.beta(ema.step))
+        print(ema.beta)
 
     print("After update:")
     for ema_p, model_p in zip(ema.ema_model.parameters(), model.parameters()):

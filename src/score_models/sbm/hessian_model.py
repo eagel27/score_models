@@ -116,8 +116,7 @@ class HessianDiagonal(Base):
             path: Optional[str] = None, 
             optimizer: Optional[torch.optim.Optimizer] = None,
             create_path: bool = True,
-            step: Optional[int] = None, # Iteration number
-            ema_length: Optional[float] = None, # Relative EMA length scale
+            **kwargs
             ):
         """
         We use the super method to save checkpoints of the hessian diagonal network.
@@ -129,24 +128,25 @@ class HessianDiagonal(Base):
                 path=path, 
                 optimizer=optimizer, 
                 create_path=create_path, 
-                step=step, 
-                ema_length=ema_length) 
+                **kwargs
+                ) 
         # Create a sub directory for the SBM 
         path = path or self.path
         sbm_path = os.path.join(path, "score_model")
         if not os.path.exists(sbm_path):
-            self.score_model.save(sbm_path, create_path=True)
+            self.score_model.save(sbm_path, create_path=True, **kwargs)
     
     def load(
             self, 
             checkpoint: Optional[int] = None, 
             ema_length: Optional[float] = None,
             raise_error: bool = True,
+            **kwargs
             ):
         """
         Super method reloads the HessianDiagonal net.
         Then we load the base score model from the score_model sub-directory.
         """
-        super().load(checkpoint, ema_length=ema_length, raise_error=raise_error)
+        super().load(checkpoint, ema_length=ema_length, raise_error=raise_error, **kwargs)
         sbm_path = os.path.join(self.path, "score_model")
         self.score_model = ScoreModel(path=sbm_path)
