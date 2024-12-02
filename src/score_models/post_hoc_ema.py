@@ -75,17 +75,14 @@ class PostHocEMA:
     
     def checkpoint_weights(self, paths, ema_length: float):
         # TODO Maybe implement some logic to choose the target step and discard checkpoints saved later
-        if ema_length < 0 or ema_length > self.ema_lengths[-1]:
-            raise ValueError(f"EMA length {ema_length} is out of bounds, should be in [{self.ema_lengths[0]}, {self.ema_lengths[-1]}]")
+        if ema_length < 0 or ema_length > 0.28:
+            raise ValueError(f"EMA length {ema_length} is out of bounds, should be in [0, 0.28]")
 
         # Grab ema_length and step number for each checkpoint
-        gammas = torch.tensor(
-                [ema_length_to_gamma(ema_length_from_path(path)) for path in paths],
-                device=self.device
-                )
-        steps = torch.tensor([step_from_path(path) for path in paths], device=self.device)
+        gammas = np.array([ema_length_to_gamma(ema_length_from_path(path)) for path in paths])
+        steps = np.array([step_from_path(path) for path in paths])
         # Target gamma and step (last step)
-        target_gamma = torch.tensor(ema_length_to_gamma(ema_length), device=self.device)
+        target_gamma = np.array(ema_length_to_gamma(ema_length))
         target_step = steps.max() 
         # Compute the dot product and solve for the weights
         weights = solve_weights(steps, gammas, target_step, target_gamma)

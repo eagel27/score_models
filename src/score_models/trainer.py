@@ -17,12 +17,16 @@ from .save_load_utils import (
         remove_oldest_checkpoint, 
         last_checkpoint,
         load_checkpoint,
+        save_checkpoint,
         load_global_step,
         update_loss_file
         )
 
 
 __all__ = ["Trainer"]
+
+def is_finite(number: Union[int, float]) -> bool:
+    return not (np.isnan(number) or np.isinf(number))
 
 def inverse_sqrt_schedule(step: int, learning_rate_decay: Optional[int] = None, warmup: int = 0):
     if learning_rate_decay is None:
@@ -226,9 +230,9 @@ class Trainer:
         when the number of checkpoints exceeds models_to_keep.
         """
         if self.path:
-            for ema_length, ema in zip(self.ema_lengths, self.emas):
-                ema.ema_model.save(self.path, optimizer=self.optimizer, ema_length=ema_length, step=self.global_step)
-        
+            save_checkpoint(self.optimizer, self.path, key="optimizer", step=self.global_step)
+            for i, (ema_length, ema) in enumerate(zip(self.ema_lengths, self.emas)):
+                ema.ema_model.save(self.path, ema_length=ema_length, step=self.global_step)
             checkpoint = last_checkpoint(self.path)
             update_loss_file(self.path, checkpoint, self.global_step, loss, time_per_step)
                 
@@ -269,7 +273,12 @@ class Trainer:
             self.lr_scheduler.step()
             # Logging
             time_per_step_avg += time.time() - start
-            cost += loss.item()
+            if not is_finite(loss.item()):
+                if not self.force_finite: # If force_finite, prevent the NaN from ruining the training
+                    cost += loss.item() # Make sure training stops when loss is NaN or inf
+                    break
+            else:
+                cost += loss.item()
             self.global_step += 1
         cost /= self.iterations_per_epoch 
         time_per_step_avg /= self.iterations_per_epoch
