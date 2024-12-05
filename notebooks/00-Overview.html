@@ -395,6 +395,7 @@
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">score_models.plot_utils</span> <span class="kn">import</span> <span class="o">*</span>
 <span class="kn">from</span> <span class="nn">score_models.toy_distributions</span> <span class="kn">import</span> <span class="o">*</span>
 <span class="kn">import</span> <span class="nn">torch</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">style</span><span class="o">.</span><span class="n">use</span><span class="p">(</span><span class="s2">&quot;dark_background&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -460,7 +461,7 @@
 </div>
 </details>
 <div class="cell_output docutils container">
-<img alt="../_images/39ffcdb617698669d171c9bd0846c56ba244170073c624650119c1e6afbb02be.png" src="../_images/39ffcdb617698669d171c9bd0846c56ba244170073c624650119c1e6afbb02be.png" />
+<img alt="../_images/2278aeba13a1d3c9d688d5168b3767de2723f28ea9eefbbf215336b7d3be451a.png" src="../_images/2278aeba13a1d3c9d688d5168b3767de2723f28ea9eefbbf215336b7d3be451a.png" />
 </div>
 </div>
 </section>
@@ -504,21 +505,24 @@
 <span class="n">E</span> <span class="o">=</span> <span class="mi">400</span>
 <span class="n">B</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="mi">7</span><span class="p">)</span>
 <span class="n">lr</span> <span class="o">=</span> <span class="mf">1e-3</span>
-<span class="n">ema_decay</span> <span class="o">=</span> <span class="mf">0.99</span>
+<span class="c1"># ema_decay = 0.99</span>
+<span class="n">ema_lengths</span> <span class="o">=</span> <span class="mf">0.05</span>
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">ScoreModel</span><span class="p">(</span><span class="n">net</span><span class="p">,</span> <span class="n">sde</span><span class="p">)</span>
-<span class="n">losses</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">epochs</span><span class="o">=</span><span class="n">E</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="n">B</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="n">lr</span><span class="p">,</span> <span class="n">ema_decay</span><span class="o">=</span><span class="n">ema_decay</span><span class="p">)</span>
+<span class="n">losses</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">epochs</span><span class="o">=</span><span class="n">E</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="n">B</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="n">lr</span><span class="p">,</span> <span class="n">ema_lengths</span><span class="o">=</span><span class="n">ema_lengths</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>No path provided. Training checkpoints will not be saved.
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>MLP network has 0.10M parameters.
+Using Karras EMA with ema lengths [0.05]
+No path provided. Training checkpoints will not be saved.
 </pre></div>
 </div>
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Epoch 400 | Cost: 7.5e-01 |: 100%|██████████| 400/400 [01:34&lt;00:00,  4.24it/s]
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Epoch 400 | Cost: 7.0e-01 |: 100%|██████████| 400/400 [01:04&lt;00:00,  6.23it/s]
 </pre></div>
 </div>
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Finished training after 0.026 hours.
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Finished training after 0.018 hours.
 </pre></div>
 </div>
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>
@@ -542,7 +546,7 @@
 </div>
 </details>
 <div class="cell_output docutils container">
-<img alt="../_images/473fc011f4cec6135112af2b7863dea56430b28e7083c622ecec7939470b0c02.png" src="../_images/473fc011f4cec6135112af2b7863dea56430b28e7083c622ecec7939470b0c02.png" />
+<img alt="../_images/7c2a7336bd8a53dbe86f6d304e80111e4eca66031ff47c0b4f98cbaa22e31830.png" src="../_images/7c2a7336bd8a53dbe86f6d304e80111e4eca66031ff47c0b4f98cbaa22e31830.png" />
 </div>
 </div>
 </section>
@@ -556,10 +560,7 @@
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>t=1 | sigma=2 | x=0.05±2:   0%|          | 0/100 [00:00&lt;?, ?it/s]
-</pre></div>
-</div>
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>t=0.01 | sigma=0.01 | x=0.1±0.7: 100%|██████████| 100/100 [00:04&lt;00:00, 23.30it/s]
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>t=0.01 | sigma=0.01 | x=0.1±0.7: 100%|██████████| 100/100 [00:01&lt;00:00, 83.56it/s]
 </pre></div>
 </div>
 </div>
@@ -589,7 +590,7 @@
 </div>
 </details>
 <div class="cell_output docutils container">
-<img alt="../_images/c82bd725d84be433db38c9ce5309e5d31469d82ccfe0f7ad053235c0a6ec4fa3.png" src="../_images/c82bd725d84be433db38c9ce5309e5d31469d82ccfe0f7ad053235c0a6ec4fa3.png" />
+<img alt="../_images/9b49efa3892b6f080eeb7bd42d51190b939967d6e14441e9503e2db74a3e9c1e.png" src="../_images/9b49efa3892b6f080eeb7bd42d51190b939967d6e14441e9503e2db74a3e9c1e.png" />
 </div>
 </div>
 </section>
