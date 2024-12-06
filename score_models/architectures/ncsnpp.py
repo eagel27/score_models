@@ -6,6 +6,32 @@ import torch.nn as nn
 import functools
 import torch
 import numpy as np
+from torch import pi
+
+
+class FourierFeatures(nn.Module):
+    def __init__(self, first=5.0, last=6.0, step=1.0):
+        super().__init__()
+        self.freqs_exponent = torch.arange(first, last + 1e-8, step)
+
+    @property
+    def num_features(self):
+        return len(self.freqs_exponent) * 2
+
+    def forward(self, x):
+        assert len(x.shape) >= 2
+
+        # Compute (2pi * 2^n) for n in freqs.
+        freqs_exponent = self.freqs_exponent.to(dtype=x.dtype, device=x.device)  # (F, )
+        freqs = 2.0**freqs_exponent * 2 * pi  # (F, )
+        freqs = freqs.view(-1, *([1] * (x.dim() - 1)))  # (F, 1, 1, ...)
+
+        # Compute (2pi * 2^n * x) for n in freqs.
+        features = freqs * x.unsqueeze(1)  # (B, F, X1, X2, ...)
+        features = features.flatten(1, 2)  # (B, F * C, X1, X2, ...)
+
+        # Output features are cos and sin of above. Shape (B, 2 * F * C, H, W).
+        return torch.cat([features.sin(), features.cos()], dim=1)
 
 
 class NCSNpp(nn.Module):
@@ -121,6 +147,7 @@ class NCSNpp(nn.Module):
             "condition_input_channels": condition_input_channels,
             "condition_vector_channels": condition_vector_channels
         }
+        self.fourier_features = FourierFeatures()
         self.act = act = get_activation(activation_type)
         self.attention = attention
 
@@ -177,7 +204,6 @@ class NCSNpp(nn.Module):
             self.pyramid_downsample = Downsample(fir=fir, fir_kernel=fir_kernel, with_conv=False)
         elif progressive_input == 'residual':
             pyramid_downsample = functools.partial(Downsample, fir=fir, fir_kernel=fir_kernel, with_conv=True)
-            
 
         if resblock_type == 'ddpm':
             ResnetBlock = functools.partial(DDPMResnetBlock,
@@ -205,8 +231,8 @@ class NCSNpp(nn.Module):
             raise ValueError(f'resblock type {resblock_type} unrecognized.')
 
         # Downsampling block
-        input_pyramid_ch = channels + self.condition_input_channels
-        modules.append(conv3x3(channels + self.condition_input_channels, nf, dimensions=dimensions))
+        input_pyramid_ch = channels + self.condition_input_channels + self.fourier_features.num_features
+        modules.append(conv3x3(input_pyramid_ch, nf, dimensions=dimensions))
         hs_c = [nf]
         in_ch = nf #+ fourier_feature_channels
         for i_level in range(num_resolutions):
@@ -312,18 +338,17 @@ class NCSNpp(nn.Module):
         m_idx += 1
         temb = modules[m_idx](self.act(temb))
         m_idx += 1
-        
-        
+
+        # Add Fourier features
+        if self.fourier_features:
+            ffeatures = self.fourier_features(x)
+            x = torch.concat([x, ffeatures], axis=1)
+
         if self.conditioned:
             for j, condition in enumerate(args):
                 if self.condition_type[j].lower() == "input":
                     x = torch.cat([x, condition], dim=1)
-        
-        # Add Fourier features
-        # if self.fourier_features:
-            # ffeatures = self.fourier_features(x)
-            # x = torch.concat([x, ffeatures], axis=1)
-        
+
         # Downsampling block
         input_pyramid = None
         if self.progressive_input != 'none':
