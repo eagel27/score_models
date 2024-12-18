@@ -83,7 +83,7 @@ class NCSNpp(nn.Module):
             condition_num_embedding:tuple[int,...]=None,
             condition_input_channels:int=None,
             condition_vector_channels:int=None,
-            # fourier_features=False,
+            fourier_features=False,
             # n_min=7,
             # n_max=8,
             **kwargs
@@ -147,7 +147,11 @@ class NCSNpp(nn.Module):
             "condition_input_channels": condition_input_channels,
             "condition_vector_channels": condition_vector_channels
         }
-        self.fourier_features = FourierFeatures()
+
+        self.fourier_features = None
+        if fourier_features:
+            self.fourier_features = FourierFeatures()
+
         self.act = act = get_activation(activation_type)
         self.attention = attention
 
@@ -231,7 +235,10 @@ class NCSNpp(nn.Module):
             raise ValueError(f'resblock type {resblock_type} unrecognized.')
 
         # Downsampling block
-        input_pyramid_ch = channels + self.condition_input_channels + self.fourier_features.num_features
+        input_pyramid_ch = channels + self.condition_input_channels
+        if self.fourier_features:
+            input_pyramid_ch += self.fourier_features.num_features
+
         modules.append(conv3x3(input_pyramid_ch, nf, dimensions=dimensions))
         hs_c = [nf]
         in_ch = nf #+ fourier_feature_channels
