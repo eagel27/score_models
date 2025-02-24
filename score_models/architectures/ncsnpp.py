@@ -10,7 +10,7 @@ from torch import pi
 
 
 class FourierFeatures(nn.Module):
-    def __init__(self, first=5.0, last=6.0, step=1.0):
+    def __init__(self, first=1.0, last=2.0, step=1.0):
         super().__init__()
         self.freqs_exponent = torch.arange(first, last + 1e-8, step)
 
@@ -19,6 +19,7 @@ class FourierFeatures(nn.Module):
         return len(self.freqs_exponent) * 2
 
     def forward(self, x):
+        print(x.shape, self.num_features)
         assert len(x.shape) >= 2
 
         # Compute (2pi * 2^n) for n in freqs.
@@ -84,6 +85,7 @@ class NCSNpp(nn.Module):
             condition_input_channels:int=None,
             condition_vector_channels:int=None,
             fourier_features=False,
+            fourier_features_cond=False,
             # n_min=7,
             # n_max=8,
             **kwargs
@@ -151,6 +153,10 @@ class NCSNpp(nn.Module):
         self.fourier_features = None
         if fourier_features:
             self.fourier_features = FourierFeatures()
+
+        self.fourier_features_cond = None
+        if fourier_features_cond:
+            self.fourier_features_cond = FourierFeatures()
 
         self.act = act = get_activation(activation_type)
         self.attention = attention
@@ -238,6 +244,9 @@ class NCSNpp(nn.Module):
         input_pyramid_ch = channels + self.condition_input_channels
         if self.fourier_features:
             input_pyramid_ch += self.fourier_features.num_features
+
+        if self.fourier_features_cond:
+            input_pyramid_ch += self.fourier_features_cond.num_features * self.condition_input_channels
 
         modules.append(conv3x3(input_pyramid_ch, nf, dimensions=dimensions))
         hs_c = [nf]
@@ -355,6 +364,11 @@ class NCSNpp(nn.Module):
             for j, condition in enumerate(args):
                 if self.condition_type[j].lower() == "input":
                     x = torch.cat([x, condition], dim=1)
+
+                    if self.fourier_features_cond:
+                        ffeatures_cond = self.fourier_features_cond(condition)
+                        x = torch.concat([x, ffeatures_cond], axis=1)
+
 
         # Downsampling block
         input_pyramid = None
