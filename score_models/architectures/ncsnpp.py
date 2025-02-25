@@ -19,7 +19,6 @@ class FourierFeatures(nn.Module):
         return len(self.freqs_exponent) * 2
 
     def forward(self, x):
-        print(x.shape, self.num_features)
         assert len(x.shape) >= 2
 
         # Compute (2pi * 2^n) for n in freqs.
